@@ -22,6 +22,21 @@ let nextReminderAt = 0; // epoch ms of the next due reminder
 let paused = false;
 let userName = ''; // personalises the greeting; stored per-user, never in the repo
 
+function configureMacMenuBarMode() {
+  if (process.platform !== 'darwin') return;
+
+  try {
+    if (typeof app.setActivationPolicy === 'function') {
+      app.setActivationPolicy('accessory');
+    }
+    if (app.dock) app.dock.hide();
+  } catch (e) {
+    /* macOS-only APIs may be unavailable in some Electron runtimes */
+  }
+}
+
+configureMacMenuBarMode();
+
 // ---- Per-user config (lives in the OS user-data folder, not this repo) ----
 function configPath() {
   return path.join(app.getPath('userData'), 'config.json');
@@ -93,6 +108,7 @@ function positionWindow() {
 function triggerReminder() {
   if (paused || !win) return;
   if (!isWithinActiveHours()) return;
+  configureMacMenuBarMode();
 
   nextReminderAt = Date.now() + INTERVAL_MIN * 60000; // schedule the next nudge
   updateTrayTooltip();
@@ -153,8 +169,12 @@ function createWindow() {
 }
 
 function openNameWindow() {
+  configureMacMenuBarMode();
+
   if (nameWin) {
+    configureMacMenuBarMode();
     nameWin.focus();
+    configureMacMenuBarMode();
     return;
   }
   nameWin = new BrowserWindow({
@@ -164,7 +184,7 @@ function openNameWindow() {
     resizable: false,
     minimizable: false,
     maximizable: false,
-    skipTaskbar: false,
+    skipTaskbar: true,
     alwaysOnTop: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -174,6 +194,8 @@ function openNameWindow() {
   });
   nameWin.setMenuBarVisibility(false);
   nameWin.loadFile(path.join(__dirname, 'renderer', 'name.html'));
+  nameWin.on('show', configureMacMenuBarMode);
+  nameWin.on('focus', configureMacMenuBarMode);
   nameWin.on('closed', () => {
     nameWin = null;
   });
@@ -273,14 +295,15 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', () => triggerReminder());
+  app.on('activate', configureMacMenuBarMode);
+  app.on('browser-window-created', (_event, window) => {
+    configureMacMenuBarMode();
+    window.on('show', configureMacMenuBarMode);
+    window.on('focus', configureMacMenuBarMode);
+  });
 
   app.whenReady().then(() => {
-    // Hydrate Buddy is a menu-bar companion on macOS, not a Dock application.
-    // Keeping it out of the Dock makes the packaged app behave like a native
-    // background utility while the tray icon remains available.
-    if (process.platform === 'darwin' && app.dock) {
-      app.dock.hide();
-    }
+    configureMacMenuBarMode();
 
     userName = (loadConfig().name || '').trim();
     createWindow();

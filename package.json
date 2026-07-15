@@ -3,11 +3,21 @@
   "version": "0.1.0",
   "description": "A small desktop companion for hydration reminders.",
   "author": "jocsa",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/jocsas/drink-water-buddy.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dist": "npm run dist:mac",
-    "dist:mac": "electron-builder --mac dmg zip",
+    "dist:mac": "npm run release:mac",
+    "dist:mac:dev": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never -c.mac.forceCodeSigning=false -c.mac.identity=null -c.mac.notarize=false",
+    "dist:mac:friends": "npm run dist:mac:friends:m4",
+    "dist:mac:friends:m4": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never -c.mac.forceCodeSigning=false -c.mac.identity=- -c.mac.notarize=false -c.mac.hardenedRuntime=false -c.mac.gatekeeperAssess=false && node scripts/verify-mac-menu-bar.mjs",
+    "dist:mac:friends:universal": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --universal --publish never -c.mac.forceCodeSigning=false -c.mac.identity=- -c.mac.notarize=false -c.mac.hardenedRuntime=false -c.mac.gatekeeperAssess=false && node scripts/verify-mac-menu-bar.mjs",
+    "release:mac": "node scripts/assert-mac-release-env.mjs && electron-builder --mac dmg zip --publish never && node scripts/verify-mac-release.mjs",
+    "release:github": "node scripts/assert-mac-release-env.mjs && node scripts/assert-github-release-env.mjs && electron-builder --mac dmg zip --publish always && node scripts/verify-mac-release.mjs",
     "dist:win": "electron-builder --win nsis"
   },
   "keywords": [
@@ -19,8 +29,8 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.local.hydratebuddy",
@@ -44,14 +54,33 @@
       "icon": "build/icon.png"
     },
     "mac": {
+      "type": "distribution",
       "target": [
         "dmg",
         "zip"
       ],
       "icon": "build/icon.png",
       "category": "public.app-category.healthcare-fitness",
-      "artifactName": "HydrateBuddy-${version}-${arch}.${ext}"
+      "artifactName": "HydrateBuddy-${version}-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": true,
+      "strictVerify": true,
+      "forceCodeSigning": true,
+      "notarize": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "extendInfo": {
+        "LSUIElement": true
+      }
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "jocsas",
+        "repo": "drink-water-buddy",
+        "releaseType": "draft"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -61,5 +90,8 @@
       "shortcutName": "Hydrate Buddy",
       "artifactName": "HydrateBuddy-Setup-${version}.${ext}"
     }
+  },
+  "allowScripts": {
+    "electron-winstaller": false
   }
 }
