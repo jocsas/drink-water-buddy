@@ -1,0 +1,65 @@
+{
+  "name": "hydrate-buddy-app",
+  "version": "0.1.0",
+  "description": "A small desktop companion for hydration reminders.",
+  "author": "jocsa",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "npm run dist:mac",
+    "dist:mac": "electron-builder --mac dmg zip",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "keywords": [
+    "electron",
+    "desktop-pet",
+    "water-reminder",
+    "hydration",
+    "pixel-art"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.local.hydratebuddy",
+    "productName": "Hydrate Buddy",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/idle.png",
+      "assets/drinking.png",
+      "assets/tray.png"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.healthcare-fitness",
+      "artifactName": "HydrateBuddy-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Hydrate Buddy",
+      "artifactName": "HydrateBuddy-Setup-${version}.${ext}"
+    }
+  }
+}
