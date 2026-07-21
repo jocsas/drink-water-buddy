@@ -10,6 +10,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "dev": "node scripts/dev.mjs",
     "dist": "npm run dist:mac",
     "dist:mac": "npm run release:mac",
     "dist:mac:dev": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never -c.mac.forceCodeSigning=false -c.mac.identity=null -c.mac.notarize=false",
@@ -42,6 +43,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "shared/**/*",
       "renderer/**/*",
       "assets/idle.png",
       "assets/drinking.png",

@@ -1,6 +1,7 @@
 const pet = document.getElementById('pet');
 const spriteIdle = document.getElementById('sprite-idle');
 const spriteDrinking = document.getElementById('sprite-drinking');
+const spriteDroid = document.getElementById('sprite-droid');
 const bubble = document.getElementById('bubble');
 const bubbleText = document.getElementById('bubble-text');
 const buttons = document.getElementById('buttons');
@@ -9,45 +10,67 @@ const snoozeBtn = document.getElementById('snooze-btn');
 const confetti = document.getElementById('confetti');
 
 let busy = false; // ignore clicks while an animation is running
-let currentName = ''; // set from the reminder payload each time she appears
+let currentSettings = {
+  name: '',
+  intervalMin: 45,
+  snoozeMin: 10,
+  themeId: 'default',
+};
+let activeTheme = window.HYDRATE_THEMES.default;
+
+const glyphs = {
+  drop: '💧',
+  sparkle: '✨',
+  heart: '💙',
+  bubble: '🫧',
+  star: '⭐',
+  diamond: '◆',
+  dot: '•',
+  ship: '▲',
+};
 
 const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
-// Personalised when a name is set, generic otherwise.
-function promptFor(name) {
-  if (name) {
-    return pick([
-      `${name}, time to drink water to keep your skin glowing!`,
-      `${name}, hydration check! Take a sip 💧`,
-      `Water break, ${name}! Your body will thank you.`,
-      `Psst ${name}… a few sips of water? Stay glowing!`,
-      `Don't forget me, ${name} — drink some water!`,
-    ]);
-  }
-  return pick([
-    'Time to drink water to keep your skin glowing!',
-    'Hydration check! Take a sip of water 💧',
-    'Water break! Your body will thank you.',
-    'Psst… a few sips of water? Stay glowing!',
-    "Don't forget me — drink some water!",
-  ]);
+function themeFor(themeId) {
+  return window.HYDRATE_THEMES[themeId] || window.HYDRATE_THEMES.default;
 }
 
-function cheerFor(name) {
-  if (name) {
-    return pick([
-      `Yay ${name}! Stay glowing ✨`,
-      `Amazing, ${name}! Keep it up 💧`,
-      `That's the spirit, ${name}! 🥤`,
-      `Hydrated and happy, ${name}! ✨`,
-    ]);
-  }
-  return pick([
-    'Yay! Stay glowing ✨',
-    'Amazing! Keep it up 💧',
-    "That's the spirit! 🥤",
-    'Hydrated and happy! ✨',
-  ]);
+function format(text, values = {}) {
+  return String(text || '').replace(/\{(\w+)\}/g, (_match, key) => values[key] ?? '');
+}
+
+function applyTheme(themeId) {
+  activeTheme = themeFor(themeId);
+  document.body.dataset.theme = activeTheme.id;
+
+  Object.entries(activeTheme.cssVars || {}).forEach(([property, value]) => {
+    document.getElementById('stage').style.setProperty(property, value);
+  });
+
+  yesBtn.textContent = activeTheme.buttons.yes;
+  snoozeBtn.textContent = activeTheme.buttons.snooze;
+  showDrinking(false);
+}
+
+function applySettings(nextSettings = {}) {
+  currentSettings = {
+    ...currentSettings,
+    ...nextSettings,
+    name: String(nextSettings.name ?? currentSettings.name ?? '').trim(),
+  };
+  applyTheme(currentSettings.themeId);
+}
+
+function promptFor() {
+  const name = currentSettings.name;
+  const lines = name ? activeTheme.namedPrompts : activeTheme.prompts;
+  return format(pick(lines), { name, minutes: currentSettings.snoozeMin });
+}
+
+function cheerFor() {
+  const name = currentSettings.name;
+  const lines = name ? activeTheme.namedCheers : activeTheme.cheers;
+  return format(pick(lines), { name, minutes: currentSettings.snoozeMin });
 }
 
 function wait(ms) {
@@ -55,8 +78,12 @@ function wait(ms) {
 }
 
 function showDrinking(on) {
-  spriteIdle.classList.toggle('hidden', on);
-  spriteDrinking.classList.toggle('hidden', !on);
+  const useDroid = activeTheme.character === 'droid';
+
+  spriteIdle.classList.toggle('hidden', useDroid || on);
+  spriteDrinking.classList.toggle('hidden', useDroid || !on);
+  spriteDroid.classList.toggle('hidden', !useDroid);
+  spriteDroid.classList.toggle('is-drinking', useDroid && on);
 }
 
 // ------------------------------------------------------------ walk in / out
@@ -91,15 +118,16 @@ function showBubble(text, withButtons) {
 
 // -------------------------------------------------------------- celebration
 function burstConfetti() {
-  const glyphs = ['💧', '✨', '💙', '🫧', '⭐'];
-  const colors = ['#37c24a', '#4aa3df', '#ffd447', '#ff7a59', '#8ad6ff'];
+  const themeGlyphs = activeTheme.confettiGlyphs || window.HYDRATE_THEMES.default.confettiGlyphs;
+  const colors = activeTheme.confettiColors || window.HYDRATE_THEMES.default.confettiColors;
   const count = 42;
   for (let i = 0; i < count; i++) {
     const piece = document.createElement('div');
     piece.className = 'confetti-piece';
     const useGlyph = Math.random() < 0.5;
     if (useGlyph) {
-      piece.textContent = glyphs[(Math.random() * glyphs.length) | 0];
+      const key = themeGlyphs[(Math.random() * themeGlyphs.length) | 0];
+      piece.textContent = glyphs[key] || key;
     } else {
       piece.textContent = '■';
       piece.style.color = colors[(Math.random() * colors.length) | 0];
@@ -115,7 +143,7 @@ function burstConfetti() {
 }
 
 async function celebrate() {
-  showBubble(cheerFor(currentName), false);
+  showBubble(cheerFor(), false);
   showDrinking(true); // she takes a sip
   await wait(950);
   showDrinking(false);
@@ -126,21 +154,21 @@ async function celebrate() {
 }
 
 // ------------------------------------------------------------------- flow
-async function runReminder(name) {
+async function runReminder(nextSettings) {
   if (busy) return;
   busy = true;
-  currentName = name || '';
+  applySettings(nextSettings || {});
   await walkIn();
-  showBubble(promptFor(currentName), true);
+  showBubble(promptFor(), true);
   busy = false;
 }
 
 async function onYes() {
   if (busy) return;
   busy = true;
-  window.hydrate.yes(); // schedule the next nudge (+45 min)
+  window.hydrate.yes(); // schedule the next nudge using the configured interval
   await celebrate();
-  showBubble('See you in a bit! 👋', false);
+  showBubble(activeTheme.goodbye, false);
   await wait(600);
   await walkOut();
   window.hydrate.hide();
@@ -151,10 +179,11 @@ async function onSnooze() {
   if (busy) return;
   busy = true;
   window.hydrate.snooze(); // come back in 10 min
-  const msg = currentName
-    ? `I'll come back in 10 mins, ${currentName}!`
-    : "I'll come back in 10 mins!";
-  showBubble(msg, false);
+  const template = currentSettings.name ? activeTheme.namedSnooze : activeTheme.snooze;
+  showBubble(
+    format(template, { name: currentSettings.name, minutes: currentSettings.snoozeMin }),
+    false
+  );
   await wait(1400);
   await walkOut();
   window.hydrate.hide();
@@ -164,5 +193,7 @@ async function onSnooze() {
 yesBtn.addEventListener('click', onYes);
 snoozeBtn.addEventListener('click', onSnooze);
 
-// Triggered by the main process every 45 min (and once shortly after launch).
-window.hydrate.onShow((payload) => runReminder(payload && payload.name));
+// Triggered by the main process using the configured reminder interval.
+window.hydrate.getSettings().then(applySettings);
+window.hydrate.onSettingsUpdated(applySettings);
+window.hydrate.onShow((payload) => runReminder(payload));

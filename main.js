@@ -1,26 +1,30 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, screen, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const THEMES = require('./shared/themes');
 
 // ---- Configuration -------------------------------------------------------
 const ACTIVE_START_HOUR = 10; // 10:00 IST — first hour reminders may appear
 const ACTIVE_END_HOUR = 23;   // 23:00 IST (11 PM) — reminders stop after this
-const INTERVAL_MIN = 45;      // normal cadence
-const SNOOZE_MIN = 10;        // "I'll come back in 10 mins"
+const DEFAULT_INTERVAL_MIN = 45; // normal cadence
+const DEFAULT_SNOOZE_MIN = 10;   // "I'll come back in 10 mins"
 const GREETING_DELAY_MS = 6000; // first hello after launch, so you can see it work
 
 const WIN_WIDTH = 360;
 const WIN_HEIGHT = 430;
 const EDGE_MARGIN = 8;
+const INTERVAL_OPTIONS = [15, 30, 45, 60, 90, 120];
+const SNOOZE_OPTIONS = [5, 10, 15, 20, 30];
+const THEME_IDS = Object.keys(THEMES);
 // --------------------------------------------------------------------------
 
 let win = null;
-let nameWin = null;
+let settingsWin = null;
 let tray = null;
 let ticker = null;
 let nextReminderAt = 0; // epoch ms of the next due reminder
 let paused = false;
-let userName = ''; // personalises the greeting; stored per-user, never in the repo
+let settings = normalizeSettings({}); // stored per-user, never in the repo
 
 function configureMacMenuBarMode() {
   if (process.platform !== 'darwin') return;
@@ -55,6 +59,66 @@ function saveConfig(cfg) {
   } catch (e) {
     console.error('Failed to save config:', e);
   }
+}
+
+function clampNumber(value, fallback, min, max) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function normalizeSettings(raw = {}) {
+  const cfg = raw && typeof raw === 'object' ? raw : {};
+  const themeId = THEME_IDS.includes(cfg.themeId) ? cfg.themeId : 'default';
+
+  return {
+    name: String(cfg.name || '').trim().slice(0, 24),
+    intervalMin: clampNumber(cfg.intervalMin, DEFAULT_INTERVAL_MIN, 1, 240),
+    snoozeMin: clampNumber(cfg.snoozeMin, DEFAULT_SNOOZE_MIN, 1, 120),
+    themeId,
+  };
+}
+
+function loadSettings() {
+  return normalizeSettings(loadConfig());
+}
+
+function reminderDelayMs() {
+  return settings.intervalMin * 60000;
+}
+
+function snoozeDelayMs() {
+  return settings.snoozeMin * 60000;
+}
+
+function sendSettingsToWindows() {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('settings:updated', settings);
+  }
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.webContents.send('settings:updated', settings);
+  }
+}
+
+function applySettings(nextSettings, opts = {}) {
+  const incoming = nextSettings && typeof nextSettings === 'object' && !Array.isArray(nextSettings)
+    ? nextSettings
+    : {};
+  settings = normalizeSettings({ ...settings, ...incoming });
+  saveConfig(settings);
+
+  if (opts.reschedule) {
+    nextReminderAt = Date.now() + reminderDelayMs();
+  }
+
+  updateTrayTooltip();
+  if (tray) rebuildTrayMenu();
+  sendSettingsToWindows();
+  return settings;
+}
+
+function themeLabel(themeId = settings.themeId) {
+  return THEMES[themeId]?.label || THEMES.default.label;
 }
 
 /** Current wall-clock in IST, independent of the machine's own timezone. */
@@ -110,18 +174,17 @@ function triggerReminder() {
   if (!isWithinActiveHours()) return;
   configureMacMenuBarMode();
 
-  nextReminderAt = Date.now() + INTERVAL_MIN * 60000; // schedule the next nudge
+  // Re-read settings each time so a failed/early startup read can't strand the
+  // session with stale config (user data may not be ready the instant
+  // auto-start launches at login).
+  settings = loadSettings();
+  nextReminderAt = Date.now() + reminderDelayMs(); // schedule the next nudge
   updateTrayTooltip();
-
-  // Re-read the name each time so a failed/early startup read can't strand the
-  // session name-less (config lives on the roaming profile, which may not be
-  // ready the instant auto-start launches at login).
-  userName = (loadConfig().name || '').trim();
 
   positionWindow();
   win.showInactive(); // appear without stealing keyboard focus
   win.setAlwaysOnTop(true, 'screen-saver');
-  win.webContents.send('reminder:show', { name: userName });
+  win.webContents.send('reminder:show', settings);
 }
 
 function updateTrayTooltip() {
@@ -131,7 +194,7 @@ function updateTrayTooltip() {
     return;
   }
   const mins = Math.max(0, Math.round((nextReminderAt - Date.now()) / 60000));
-  tray.setToolTip(`Hydrate Buddy — next nudge in ~${mins} min`);
+  tray.setToolTip(`Hydrate Buddy — ${themeLabel()} — next nudge in ~${mins} min`);
 }
 
 function createWindow() {
@@ -168,19 +231,19 @@ function createWindow() {
   });
 }
 
-function openNameWindow() {
+function openSettingsWindow() {
   configureMacMenuBarMode();
 
-  if (nameWin) {
+  if (settingsWin) {
     configureMacMenuBarMode();
-    nameWin.focus();
+    settingsWin.focus();
     configureMacMenuBarMode();
     return;
   }
-  nameWin = new BrowserWindow({
-    width: 380,
-    height: 240,
-    title: 'Your name',
+  settingsWin = new BrowserWindow({
+    width: 430,
+    height: 470,
+    title: 'Hydrate Buddy Settings',
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -192,12 +255,12 @@ function openNameWindow() {
       nodeIntegration: false,
     },
   });
-  nameWin.setMenuBarVisibility(false);
-  nameWin.loadFile(path.join(__dirname, 'renderer', 'name.html'));
-  nameWin.on('show', configureMacMenuBarMode);
-  nameWin.on('focus', configureMacMenuBarMode);
-  nameWin.on('closed', () => {
-    nameWin = null;
+  settingsWin.setMenuBarVisibility(false);
+  settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+  settingsWin.on('show', configureMacMenuBarMode);
+  settingsWin.on('focus', configureMacMenuBarMode);
+  settingsWin.on('closed', () => {
+    settingsWin = null;
   });
 }
 
@@ -213,11 +276,52 @@ function createTray() {
 }
 
 function rebuildTrayMenu() {
+  const activeTheme = THEMES[settings.themeId] || THEMES.default;
   const template = [
-    { label: 'Drink now 💧', click: () => triggerReminder() },
+    { label: `${activeTheme.trayDrinkLabel} 💧`, click: () => triggerReminder() },
     {
-      label: userName ? `Set your name… (${userName})` : 'Set your name…',
-      click: () => openNameWindow(),
+      label: 'Settings...',
+      click: () => openSettingsWindow(),
+    },
+    { type: 'separator' },
+    {
+      label: `Reminder every ${settings.intervalMin} min`,
+      submenu: [
+        ...INTERVAL_OPTIONS.map((minutes) => ({
+          label: `${minutes} min`,
+          type: 'radio',
+          checked: settings.intervalMin === minutes,
+          click: () => applySettings({ intervalMin: minutes }, { reschedule: true }),
+        })),
+        { type: 'separator' },
+        { label: 'Custom...', click: () => openSettingsWindow() },
+      ],
+    },
+    {
+      label: `Snooze for ${settings.snoozeMin} min`,
+      submenu: [
+        ...SNOOZE_OPTIONS.map((minutes) => ({
+          label: `${minutes} min`,
+          type: 'radio',
+          checked: settings.snoozeMin === minutes,
+          click: () => applySettings({ snoozeMin: minutes }),
+        })),
+        { type: 'separator' },
+        { label: 'Custom...', click: () => openSettingsWindow() },
+      ],
+    },
+    {
+      label: `Theme: ${themeLabel()}`,
+      submenu: THEME_IDS.map((themeId) => ({
+        label: THEMES[themeId].label,
+        type: 'radio',
+        checked: settings.themeId === themeId,
+        click: () => applySettings({ themeId }),
+      })),
+    },
+    {
+      label: settings.name ? `Name: ${settings.name}` : 'Name: not set',
+      click: () => openSettingsWindow(),
     },
     {
       label: 'Pause reminders',
@@ -228,15 +332,14 @@ function rebuildTrayMenu() {
         if (paused) {
           if (win) win.hide();
         } else {
-          nextReminderAt = Date.now() + INTERVAL_MIN * 60000;
+          nextReminderAt = Date.now() + reminderDelayMs();
         }
         updateTrayTooltip();
       },
     },
   ];
 
-  // In the installed build, offer a native "start with Windows" toggle.
-  // (In dev, use `npm run autostart:enable` instead.)
+  // In the installed build, offer a native start-at-login toggle.
   if (app.isPackaged) {
     let openAtLogin = false;
     try {
@@ -269,23 +372,31 @@ function rebuildTrayMenu() {
 }
 
 // ---- IPC from the renderer ----------------------------------------------
-ipcMain.on('reminder:yes', () => { nextReminderAt = Date.now() + INTERVAL_MIN * 60000; });
-ipcMain.on('reminder:snooze', () => { nextReminderAt = Date.now() + SNOOZE_MIN * 60000; });
+ipcMain.on('reminder:yes', () => {
+  nextReminderAt = Date.now() + reminderDelayMs();
+  updateTrayTooltip();
+});
+ipcMain.on('reminder:snooze', () => {
+  nextReminderAt = Date.now() + snoozeDelayMs();
+  updateTrayTooltip();
+});
 ipcMain.on('reminder:hide', () => {
   if (win) win.hide();
 });
 
-ipcMain.handle('name:get', () => userName);
+ipcMain.handle('settings:get', () => settings);
+ipcMain.handle('settings:save', (_e, value) => applySettings(value));
+ipcMain.on('settings:close', () => {
+  if (settingsWin) settingsWin.close();
+});
+
+ipcMain.handle('name:get', () => settings.name);
 ipcMain.handle('name:save', (_e, value) => {
-  userName = String(value || '').trim().slice(0, 24);
-  const cfg = loadConfig();
-  cfg.name = userName;
-  saveConfig(cfg);
-  if (tray) rebuildTrayMenu(); // reflect the new name in the tray label
-  return userName;
+  const next = applySettings({ name: value });
+  return next.name;
 });
 ipcMain.on('name:close', () => {
-  if (nameWin) nameWin.close();
+  if (settingsWin) settingsWin.close();
 });
 // --------------------------------------------------------------------------
 
@@ -305,7 +416,7 @@ if (!gotLock) {
   app.whenReady().then(() => {
     configureMacMenuBarMode();
 
-    userName = (loadConfig().name || '').trim();
+    settings = loadSettings();
     createWindow();
     createTray();
     startScheduler();
@@ -313,7 +424,7 @@ if (!gotLock) {
     // Say hello shortly after launch (within active hours) so you see it works;
     // otherwise the first nudge waits for the next active window.
     nextReminderAt =
-      Date.now() + (isWithinActiveHours() ? GREETING_DELAY_MS : INTERVAL_MIN * 60000);
+      Date.now() + (isWithinActiveHours() ? GREETING_DELAY_MS : reminderDelayMs());
     setTimeout(tick, GREETING_DELAY_MS + 300);
 
     // Re-check the moment the laptop wakes/unlocks, so a due nudge isn't missed.

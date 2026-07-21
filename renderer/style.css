@@ -21,6 +21,29 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  --bubble-bg: #fdfdf7;
+  --bubble-border: #1c1c1c;
+  --bubble-text: #1c1c1c;
+  --bubble-shadow: rgba(0, 0, 0, 0.18);
+  --button-yes-bg: #37c24a;
+  --button-yes-hover: #2fae41;
+  --button-yes-text: #fff;
+  --button-snooze-bg: #fdfdf7;
+  --button-snooze-hover: #ececec;
+  --button-snooze-text: #1c1c1c;
+  --pet-shadow: rgba(0, 0, 0, 0.28);
+}
+
+body[data-theme='starwars'] #stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.9) 0 1px, transparent 2px),
+    radial-gradient(circle at 66% 10%, rgba(33, 212, 253, 0.75) 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 34%, rgba(248, 212, 92, 0.85) 0 1px, transparent 2px),
+    radial-gradient(circle at 36% 72%, rgba(255, 255, 255, 0.65) 0 1px, transparent 2px);
 }
 
 /* -------------------------------------------------------------- character */
@@ -36,7 +59,7 @@ body {
   transition: transform 1.15s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.4s ease;
   transform: translateX(0);
   opacity: 1;
-  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.28));
+  filter: drop-shadow(0 6px 6px var(--pet-shadow));
 }
 
 /* Off to the right, ready to walk in. */
@@ -65,6 +88,188 @@ body {
   width: auto;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+}
+
+.droid-character {
+  position: relative;
+  width: 142px;
+  height: 228px;
+  margin-bottom: 8px;
+  transform-origin: center bottom;
+}
+
+#pet.face-right .droid-character {
+  transform: scaleX(-1);
+}
+
+.droid-antenna {
+  position: absolute;
+  left: 70px;
+  top: 0;
+  width: 6px;
+  height: 28px;
+  background: #f8d45c;
+  border: 3px solid #07111f;
+  border-bottom: 0;
+}
+
+.droid-antenna::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: -12px;
+  width: 16px;
+  height: 16px;
+  border: 3px solid #07111f;
+  border-radius: 50%;
+  background: #21d4fd;
+}
+
+.droid-head {
+  position: absolute;
+  left: 28px;
+  top: 24px;
+  width: 88px;
+  height: 64px;
+  border: 5px solid #07111f;
+  border-radius: 18px 18px 10px 10px;
+  background:
+    linear-gradient(90deg, transparent 0 42%, rgba(7, 17, 31, 0.12) 42% 48%, transparent 48%),
+    #dfe8ee;
+  box-shadow: inset 0 -8px 0 #aebac4;
+}
+
+.droid-eye {
+  position: absolute;
+  top: 19px;
+  width: 15px;
+  height: 15px;
+  border: 3px solid #07111f;
+  border-radius: 50%;
+  background: #21d4fd;
+  box-shadow: 0 0 10px rgba(33, 212, 253, 0.95);
+}
+
+.droid-eye-left {
+  left: 20px;
+}
+
+.droid-eye-right {
+  right: 20px;
+}
+
+.droid-mouth {
+  position: absolute;
+  left: 29px;
+  bottom: 14px;
+  width: 30px;
+  height: 5px;
+  background: #07111f;
+}
+
+.droid-neck {
+  position: absolute;
+  left: 58px;
+  top: 86px;
+  width: 30px;
+  height: 24px;
+  border: 4px solid #07111f;
+  background: #9ba8b4;
+}
+
+.droid-body {
+  position: absolute;
+  left: 22px;
+  top: 104px;
+  width: 100px;
+  height: 86px;
+  border: 5px solid #07111f;
+  border-radius: 18px 18px 24px 24px;
+  background: #eef4f7;
+  box-shadow: inset 0 -10px 0 #acb9c3;
+}
+
+.droid-body::before,
+.droid-body::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  width: 26px;
+  height: 58px;
+  border: 4px solid #07111f;
+  background: #d0dae2;
+}
+
+.droid-body::before {
+  left: -24px;
+  border-radius: 16px 6px 12px 16px;
+}
+
+.droid-body::after {
+  right: -24px;
+  border-radius: 6px 16px 16px 12px;
+}
+
+.droid-panel {
+  position: absolute;
+  border: 3px solid #07111f;
+  background: #f8d45c;
+}
+
+.droid-panel-a {
+  left: 20px;
+  top: 18px;
+  width: 22px;
+  height: 18px;
+}
+
+.droid-panel-b {
+  right: 18px;
+  top: 18px;
+  width: 18px;
+  height: 18px;
+  background: #f87171;
+}
+
+.droid-cup {
+  position: absolute;
+  left: 37px;
+  bottom: 12px;
+  width: 28px;
+  height: 24px;
+  border: 4px solid #07111f;
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: #21d4fd;
+  transform: rotate(0deg);
+  transition: transform 0.18s ease;
+}
+
+.droid-character.is-drinking .droid-cup {
+  transform: rotate(-14deg) translateY(-6px);
+}
+
+.droid-character.is-drinking .droid-eye {
+  background: #21d07a;
+  box-shadow: 0 0 12px rgba(33, 208, 122, 0.95);
+}
+
+.droid-leg {
+  position: absolute;
+  bottom: 0;
+  width: 25px;
+  height: 42px;
+  border: 5px solid #07111f;
+  border-radius: 8px 8px 6px 6px;
+  background: #b8c5cf;
+}
+
+.droid-leg-left {
+  left: 40px;
+}
+
+.droid-leg-right {
+  right: 38px;
 }
 
 /* She turns to face the way she's walking (right, as she exits). */
@@ -100,11 +305,11 @@ body {
   top: 14px;
   left: 14px;
   right: 14px;
-  background: #fdfdf7;
-  border: 4px solid #1c1c1c;
+  background: var(--bubble-bg);
+  border: 4px solid var(--bubble-border);
   border-radius: 6px;
   padding: 16px 16px 14px;
-  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.18);
+  box-shadow: 6px 6px 0 var(--bubble-shadow);
   transform-origin: bottom right;
   transition: transform 0.28s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.2s ease;
 }
@@ -120,7 +325,7 @@ body {
   font-family: 'Press Start 2P', 'Courier New', monospace;
   font-size: 11px;
   line-height: 1.7;
-  color: #1c1c1c;
+  color: var(--bubble-text);
   text-transform: uppercase;
   text-align: center;
   margin-bottom: 14px;
@@ -135,7 +340,7 @@ body {
   height: 0;
   border-left: 12px solid transparent;
   border-right: 12px solid transparent;
-  border-top: 18px solid #1c1c1c;
+  border-top: 18px solid var(--bubble-border);
 }
 
 #bubble-tail::after {
@@ -147,7 +352,7 @@ body {
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 12px solid #fdfdf7;
+  border-top: 12px solid var(--bubble-bg);
 }
 
 /* ------------------------------------------------------------------ buttons */
@@ -162,7 +367,7 @@ body {
   font-size: 9px;
   letter-spacing: 0.5px;
   padding: 9px 10px;
-  border: 3px solid #1c1c1c;
+  border: 3px solid var(--bubble-border);
   border-radius: 4px;
   cursor: pointer;
   text-transform: uppercase;
@@ -176,21 +381,21 @@ body {
 }
 
 .btn-yes {
-  background: #37c24a;
-  color: #fff;
+  background: var(--button-yes-bg);
+  color: var(--button-yes-text);
 }
 
 .btn-yes:hover {
-  background: #2fae41;
+  background: var(--button-yes-hover);
 }
 
 .btn-snooze {
-  background: #fdfdf7;
-  color: #1c1c1c;
+  background: var(--button-snooze-bg);
+  color: var(--button-snooze-text);
 }
 
 .btn-snooze:hover {
-  background: #ececec;
+  background: var(--button-snooze-hover);
 }
 
 /* ---------------------------------------------------------------- confetti */

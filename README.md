@@ -1,7 +1,7 @@
 # Hydrate Buddy App
 
 Aplicativo Electron independente para lembretes de hidratação, com personagem
-na tela, ações de confirmação/snooze e ícone na barra do sistema.
+na tela, ações de confirmação/snooze, temas e ícone na barra do sistema.
 
 Esta pasta não contém o repositório original, `node_modules`, builds ou assets
 de desenvolvimento. Ela mantém apenas o necessário para executar e empacotar
@@ -13,6 +13,29 @@ o app.
 npm install
 npm start
 ```
+
+Para desenvolver com reinicio automatico ao editar arquivos:
+
+```bash
+npm run dev
+```
+
+Esse modo reabre o Electron quando voce muda `main.js`, `preload.js`,
+`renderer/`, `assets/` ou `package.json`.
+
+## Configurações
+
+No menu da barra do topo, use `Settings...` para ajustar:
+
+- nome usado nas frases;
+- intervalo entre lembretes;
+- tempo do snooze;
+- tema visual.
+
+O menu tambem tem atalhos para mudar rapidamente intervalo, snooze e tema. Por
+enquanto existem dois temas: `Default doll` e `Star Wars-inspired`. O tema
+galactico usa cores, frases e um personagem proprio em CSS/HTML, sem assets
+oficiais de franquia.
 
 ## Gerar o app para macOS
 
@@ -92,7 +115,8 @@ npm run dist:win
 
 - `main.js`: janela, tray, agenda e armazenamento local.
 - `preload.js`: ponte segura entre Electron e a interface.
-- `renderer/`: personagem, balão e interações.
+- `renderer/`: personagem, balão, configurações e interações.
+- `shared/themes.js`: definição dos temas disponíveis no app.
 - `assets/`: imagens usadas pelo app.
 - `build/icon.png`: ícone do aplicativo.
 
