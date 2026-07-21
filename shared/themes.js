@@ -167,6 +167,83 @@
       confettiGlyphs: ['drop', 'sparkle', 'diamond', 'star', 'dot'],
       confettiColors: ['#d72638', '#f4f4f5', '#2f343d', '#7f1d1d', '#a1a1aa'],
     },
+    wizard: {
+      id: 'wizard',
+      label: 'Wizard',
+      trayDrinkLabel: 'Potion break',
+      assetFolder: 'assets/themes/wizard',
+      exitMode: 'walk-fade',
+      animationFrameMs: 185,
+      staticFrames: {
+        idle: 'idle.png',
+        drinking: 'drinking.png',
+      },
+      animations: {
+        walk: [
+          'frames/walk-1.png',
+          'frames/walk-2.png',
+          'frames/walk-3.png',
+          'frames/walk-4.png',
+        ],
+        drinking: [
+          'frames/drink-1.png',
+          'frames/drink-2.png',
+        ],
+        celebrate: [
+          'frames/happy.png',
+          'frames/cast.png',
+          'frames/happy.png',
+        ],
+      },
+      buttons: {
+        yes: 'POTION DRUNK',
+        snooze: 'SNOOZE SPELL',
+      },
+      cssVars: {
+        '--bubble-bg': '#171022',
+        '--bubble-border': '#7c4dff',
+        '--bubble-text': '#f2eaff',
+        '--bubble-shadow': 'rgba(124, 77, 255, 0.28)',
+        '--button-yes-bg': '#56ccf2',
+        '--button-yes-hover': '#39bde8',
+        '--button-yes-text': '#06121d',
+        '--button-snooze-bg': '#2d1f46',
+        '--button-snooze-hover': '#3b2a5d',
+        '--button-snooze-text': '#f2eaff',
+        '--pet-shadow': 'rgba(124, 77, 255, 0.42)',
+      },
+      prompts: [
+        'Mana is low. Water potion required.',
+        'A tiny spell first: drink some water.',
+        'Your bottle is glowing. Take a sip.',
+        'Hydration charm ready. Cast it now.',
+        'The cauldron says: sip before scrolling.',
+      ],
+      namedPrompts: [
+        '{name}, mana is low. Water potion required.',
+        '{name}, a tiny spell first: drink some water.',
+        'Your bottle is glowing, {name}. Take a sip.',
+        'Hydration charm ready, {name}. Cast it now.',
+        '{name}, the cauldron says: sip before scrolling.',
+      ],
+      cheers: [
+        'Potion accepted. Sparkles unlocked.',
+        'Excellent spellwork. Hydration restored.',
+        'The bottle approves.',
+        'Tiny wizard victory.',
+      ],
+      namedCheers: [
+        'Potion accepted, {name}. Sparkles unlocked.',
+        'Excellent spellwork, {name}. Hydration restored.',
+        'The bottle approves, {name}.',
+        'Tiny wizard victory, {name}.',
+      ],
+      snooze: 'Snooze spell cast for {minutes} mins.',
+      namedSnooze: 'Snooze spell cast for {minutes} mins, {name}.',
+      goodbye: 'Poof. Back soon.',
+      confettiGlyphs: ['drop', 'sparkle', 'star', 'diamond', 'dot'],
+      confettiColors: ['#7c4dff', '#56ccf2', '#f2eaff', '#b66dff', '#2d1f46'],
+    },
   };
 
   if (typeof module === 'object' && module.exports) {

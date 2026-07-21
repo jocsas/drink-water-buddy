@@ -1,140 +1,151 @@
-# Hydrate Buddy App
+# Hydrate Buddy
 
-Aplicativo Electron independente para lembretes de hidratação, com personagem
-na tela, ações de confirmação/snooze, temas e ícone na barra do sistema.
+Hydrate Buddy is a tiny Electron companion that lives in the macOS menu bar and
+nudges you to drink water without sitting in the Dock. It pops in from the
+corner, says something charming, reacts when you drink or snooze, and then gets
+out of the way.
 
-Esta pasta não contém o repositório original, `node_modules`, builds ou assets
-de desenvolvimento. Ela mantém apenas o necessário para executar e empacotar
-o app.
+It is built as a playful desktop pet rather than a productivity dashboard: small
+surface area, local settings, pixel art, themed messages, and just enough
+configuration to make the reminders feel personal.
 
-## Executar localmente
+## Highlights
+
+- Menu bar only on macOS, with no Dock icon.
+- Reminder popup that appears without stealing keyboard focus.
+- Configurable name, reminder interval, snooze duration, and visual theme.
+- Per-user settings stored in the OS user-data folder.
+- Sleep/wake-aware scheduler so reminders recover after the laptop resumes.
+- Theme-specific colors, copy, tray icons, and character sprites.
+- Animated sprite support for richer themes such as `Wizard`.
+- Local/friends build scripts plus stricter signed release scripts.
+
+## Themes
+
+Hydrate Buddy currently ships with four themes:
+
+- `Default doll`: the original cozy hydration buddy.
+- `Baby Yoda`: soft greens, tiny-sage copy, and fan-style water nudges.
+- `Darth Vader`: dark red UI with dramatic, funny hydration commands.
+- `Wizard`: animated walking and drinking frames cut from a sprite sheet.
+
+Theme assets use the same folder shape so new characters are easy to add:
+
+```text
+assets/themes/<theme>/
+  idle.png
+  drinking.png
+  tray.png
+```
+
+`tray.png` is optional. If it is missing, Hydrate Buddy falls back to the default
+tray icon. If `drinking.png` is missing, the app can fall back to `idle.png`.
+
+Animated themes can also provide frame sequences:
+
+```text
+assets/themes/wizard/frames/
+  walk-1.png
+  walk-2.png
+  walk-3.png
+  walk-4.png
+  drink-1.png
+  drink-2.png
+  happy.png
+  cast.png
+```
+
+The Wizard theme is generated from a sprite sheet with:
+
+```bash
+python3 scripts/extract-wizard-theme.py /path/to/wizard-sprite-sheet.png
+```
+
+The final `Bye`/warp frame from the source sheet is intentionally not used.
+
+## Development
+
+Install dependencies once:
 
 ```bash
 npm install
+```
+
+Run normally:
+
+```bash
 npm start
 ```
 
-Para desenvolver com reinicio automatico ao editar arquivos:
+Run with automatic Electron restart while editing:
 
 ```bash
 npm run dev
 ```
 
-Esse modo reabre o Electron quando voce muda `main.js`, `preload.js`,
-`renderer/`, `assets/` ou `package.json`.
+The dev runner watches `main.js`, `preload.js`, `renderer/`, `assets/`, and
+`package.json`.
 
-## Configurações
+## Building
 
-No menu da barra do topo, use `Settings...` para ajustar:
-
-- nome usado nas frases;
-- intervalo entre lembretes;
-- tempo do snooze;
-- tema visual.
-
-O menu tambem tem atalhos para mudar rapidamente intervalo, snooze e tema. Por
-enquanto existem tres temas: `Default doll`, `Baby Yoda` e `Darth Vader`.
-
-As imagens dos personagens ficam separadas por tema:
-
-```text
-assets/themes/default/idle.png
-assets/themes/default/drinking.png
-assets/themes/default/tray.png
-assets/themes/baby-yoda/idle.png
-assets/themes/baby-yoda/drinking.png
-assets/themes/baby-yoda/tray.png
-assets/themes/darth-vader/idle.png
-assets/themes/darth-vader/drinking.png
-assets/themes/darth-vader/tray.png
-```
-
-O `tray.png` e opcional em temas novos. Se faltar, o app usa o icone do tema
-default. Enquanto um tema nao tiver `drinking.png`, o app usa `idle.png` como
-fallback temporario.
-
-## Gerar o app para macOS
-
-Build local de teste, sem assinatura de distribuição:
+For a local macOS test build without distribution signing:
 
 ```bash
 npm run dist:mac:dev
 ```
 
-Build para compartilhar diretamente com amigos, sem notarização Apple:
+For a direct Apple Silicon build to share with trusted friends:
 
 ```bash
 npm run dist:mac:friends
 ```
 
-Esse comando gera o build `arm64`, que e o correto para Macs Apple Silicon
-incluindo M1, M2, M3 e M4. O arquivo para mandar e:
+That produces:
 
 ```text
 dist/HydrateBuddy-0.1.0-arm64.dmg
 ```
 
-Ele tambem verifica que o app ficou como `LSUIElement=true`, ou seja, fora do
-Dock. Como ele nao e notarizado, o macOS pode mostrar um aviso no primeiro uso.
-Quem receber deve montar o `.dmg`, arrastar o app para Applications e abrir pelo
-Finder com Control-click ou botao direito no app, depois escolher "Open". Use
-isso apenas com pessoas que confiam em voce e sabem que e um build direto.
-
-Se voce quiser mandar um unico arquivo para Macs Intel e Apple Silicon:
+For a universal Intel plus Apple Silicon friend build:
 
 ```bash
 npm run dist:mac:friends:universal
 ```
 
-Release para distribuir:
+Friend builds are ad-hoc signed and not notarized, so macOS may show a first-run
+warning. Public release builds should use a Developer ID Application certificate
+and Apple notarization.
+
+For a signed/notarized macOS release:
 
 ```bash
 npm run dist:mac
 ```
 
-O build de release exige um certificado `Developer ID Application` válido e
-credenciais de notarização da Apple. Configure uma das opções abaixo antes de
-rodar:
+For a draft GitHub release:
 
 ```bash
-export APPLE_API_KEY=/caminho/AuthKey_XXXXXXXXXX.p8
-export APPLE_API_KEY_ID=XXXXXXXXXX
-export APPLE_API_ISSUER=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-```
-
-ou:
-
-```bash
-export APPLE_ID=voce@exemplo.com
-export APPLE_APP_SPECIFIC_PASSWORD=xxxx-xxxx-xxxx-xxxx
-export APPLE_TEAM_ID=XXXXXXXXXX
-```
-
-Os arquivos `.dmg`, `.zip`, `.blockmap` e `latest-mac.yml` serão gerados em
-`dist/`. O app macOS e os helpers sao configurados com `LSUIElement=true`, para
-ficarem fora do Dock e aparecerem apenas na barra do topo.
-
-Para criar um rascunho de release no GitHub:
-
-```bash
-export GH_TOKEN=ghp_seu_token
+export GH_TOKEN=ghp_your_token
 npm run release:github
 ```
 
-Para Windows:
+The release scripts intentionally block unsafe public builds when the required
+Developer ID and notarization credentials are missing.
 
-```bash
-npm run dist:win
+## Project Layout
+
+```text
+main.js                     Electron app, tray menu, scheduler, settings
+preload.js                  Safe IPC bridge for the renderer
+renderer/                   Popup UI, settings UI, animations
+shared/themes.js            Theme registry, colors, copy, animation metadata
+assets/themes/              Character sprites and tray icons by theme
+scripts/                    Release checks and asset extraction helpers
+build/                      macOS entitlements and app icon
 ```
 
-## Estrutura
+## Asset Notes
 
-- `main.js`: janela, tray, agenda e armazenamento local.
-- `preload.js`: ponte segura entre Electron e a interface.
-- `renderer/`: personagem, balão, configurações e interações.
-- `shared/themes.js`: definição dos temas disponíveis no app.
-- `assets/themes/<tema>/`: imagens padronizadas de cada tema.
-- `build/icon.png`: ícone do aplicativo.
-
-O projeto mantém a licença MIT da base reaproveitada. Antes de publicar, troque
-o nome, `appId`, ícone e identidade visual pelos dados do seu projeto.
+Hydrate Buddy supports fan-style and custom themes, but distributed builds should
+only include assets you have the right to share. The app code is MIT licensed;
+individual image assets may have their own usage terms.

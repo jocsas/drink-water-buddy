@@ -1,6 +1,8 @@
 const pet = document.getElementById('pet');
+const stage = document.getElementById('stage');
 const spriteIdle = document.getElementById('sprite-idle');
 const spriteDrinking = document.getElementById('sprite-drinking');
+const spriteAnimated = document.getElementById('sprite-animated');
 const bubble = document.getElementById('bubble');
 const bubbleText = document.getElementById('bubble-text');
 const buttons = document.getElementById('buttons');
@@ -9,6 +11,8 @@ const snoozeBtn = document.getElementById('snooze-btn');
 const confetti = document.getElementById('confetti');
 
 let busy = false; // ignore clicks while an animation is running
+let frameTimer = null;
+let frameAnimationToken = 0;
 let currentSettings = {
   name: '',
   intervalMin: 45,
@@ -42,8 +46,9 @@ function applyTheme(themeId) {
   activeTheme = themeFor(themeId);
   document.body.dataset.theme = activeTheme.id;
 
+  stage.removeAttribute('style');
   Object.entries(activeTheme.cssVars || {}).forEach(([property, value]) => {
-    document.getElementById('stage').style.setProperty(property, value);
+    stage.style.setProperty(property, value);
   });
 
   yesBtn.textContent = activeTheme.buttons.yes;
@@ -77,8 +82,12 @@ function wait(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function themeAssetPath(theme, file) {
+  return `../${theme.assetFolder}/${file}`;
+}
+
 function themeSpritePath(theme, state) {
-  return `../${theme.assetFolder}/${state}.png`;
+  return themeAssetPath(theme, `${state}.png`);
 }
 
 function uniqueSources(sources) {
@@ -107,13 +116,111 @@ function updateSprites() {
   const idlePath = themeSpritePath(activeTheme, 'idle');
   const drinkingPath = themeSpritePath(activeTheme, 'drinking');
 
+  if (hasFrameAnimations()) {
+    showStaticState('idle');
+    return;
+  }
+
+  stopFrameAnimation();
+  spriteAnimated.classList.add('hidden');
   setSprite(spriteIdle, [idlePath, idleFallback]);
   setSprite(spriteDrinking, [drinkingPath, idlePath, drinkingFallback, idleFallback]);
 }
 
+function hasFrameAnimations() {
+  return Boolean(activeTheme.animations);
+}
+
+function stopFrameAnimation() {
+  frameAnimationToken += 1;
+  if (frameTimer) {
+    clearTimeout(frameTimer);
+    frameTimer = null;
+  }
+}
+
+function animationFrames(name) {
+  return activeTheme.animations && activeTheme.animations[name];
+}
+
+function setAnimatedFrame(file) {
+  const defaultTheme = window.HYDRATE_THEMES.default;
+  setSprite(spriteAnimated, [
+    themeAssetPath(activeTheme, file),
+    themeSpritePath(activeTheme, 'idle'),
+    themeSpritePath(defaultTheme, 'idle'),
+  ]);
+}
+
+function showAnimatedLayer() {
+  spriteIdle.classList.add('hidden');
+  spriteDrinking.classList.add('hidden');
+  spriteAnimated.classList.remove('hidden');
+}
+
+function showStaticState(state = 'idle') {
+  if (!hasFrameAnimations()) {
+    showDrinking(state === 'drinking');
+    return;
+  }
+
+  stopFrameAnimation();
+  showAnimatedLayer();
+  const file = (activeTheme.staticFrames && activeTheme.staticFrames[state]) || `${state}.png`;
+  setAnimatedFrame(file);
+}
+
+function startFrameLoop(name) {
+  const frames = animationFrames(name);
+  if (!frames || !frames.length) return null;
+
+  stopFrameAnimation();
+  showAnimatedLayer();
+  const token = frameAnimationToken;
+  const frameMs = activeTheme.animationFrameMs || 170;
+  let index = 0;
+
+  const tick = () => {
+    if (token !== frameAnimationToken) return;
+    setAnimatedFrame(frames[index % frames.length]);
+    index += 1;
+    frameTimer = setTimeout(tick, frameMs);
+  };
+
+  tick();
+  return () => {
+    if (token === frameAnimationToken) stopFrameAnimation();
+  };
+}
+
+async function playFrameSequence(name, cycles = 1) {
+  const frames = animationFrames(name);
+  if (!frames || !frames.length) return false;
+
+  stopFrameAnimation();
+  showAnimatedLayer();
+  const token = frameAnimationToken;
+  const frameMs = activeTheme.animationFrameMs || 170;
+
+  for (let cycle = 0; cycle < cycles; cycle += 1) {
+    for (const frame of frames) {
+      if (token !== frameAnimationToken) return true;
+      setAnimatedFrame(frame);
+      await wait(frameMs);
+    }
+  }
+  return true;
+}
+
 function showDrinking(on) {
+  if (hasFrameAnimations()) {
+    showStaticState(on ? 'drinking' : 'idle');
+    return;
+  }
+
   spriteIdle.classList.toggle('hidden', on);
   spriteDrinking.classList.toggle('hidden', !on);
+  spriteAnimated.classList.add('hidden');
 }
 
 // ------------------------------------------------------------ walk in / out
@@ -125,19 +232,41 @@ async function walkIn() {
   // force reflow so the transition runs from the offstage position
   void pet.offsetWidth;
   pet.classList.add('walking');
+  const stopWalking = startFrameLoop('walk');
   pet.classList.remove('offstage');
   await wait(1150);
+  if (stopWalking) stopWalking();
   pet.classList.remove('walking');
+  showStaticState('idle');
 }
 
 async function walkOut() {
   bubble.classList.add('hidden');
+
+  if (hasFrameAnimations() && activeTheme.exitMode === 'walk-fade') {
+    pet.classList.add('face-right');
+    pet.classList.add('walking');
+    pet.classList.add('slow-fade');
+    const stopWalking = startFrameLoop('walk');
+    pet.classList.add('offstage');
+    await wait(1250);
+    if (stopWalking) stopWalking();
+    pet.classList.remove('walking');
+    pet.classList.remove('face-right');
+    pet.classList.remove('slow-fade');
+    showStaticState('idle');
+    return;
+  }
+
   pet.classList.add('face-right'); // turn to face the exit direction
   pet.classList.add('walking');
+  const stopWalking = startFrameLoop('walk');
   pet.classList.add('offstage');
   await wait(1150);
+  if (stopWalking) stopWalking();
   pet.classList.remove('walking');
   pet.classList.remove('face-right');
+  showStaticState('idle');
 }
 
 function showBubble(text, withButtons) {
@@ -174,6 +303,18 @@ function burstConfetti() {
 
 async function celebrate() {
   showBubble(cheerFor(), false);
+
+  if (hasFrameAnimations()) {
+    await playFrameSequence('drinking', 2);
+    pet.classList.add('celebrate');
+    burstConfetti();
+    await playFrameSequence('celebrate');
+    await wait(350);
+    pet.classList.remove('celebrate');
+    showStaticState('idle');
+    return;
+  }
+
   showDrinking(true); // she takes a sip
   await wait(950);
   showDrinking(false);

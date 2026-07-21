@@ -40,7 +40,8 @@ body {
 }
 
 body[data-theme='baby-yoda'] #stage::before,
-body[data-theme='darth-vader'] #stage::before {
+body[data-theme='darth-vader'] #stage::before,
+body[data-theme='wizard'] #stage::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -65,6 +66,15 @@ body[data-theme='darth-vader'] #stage::before {
     radial-gradient(circle at 34% 74%, rgba(215, 38, 56, 0.7) 0 1px, transparent 2px);
 }
 
+body[data-theme='wizard'] #stage::before {
+  opacity: 0.8;
+  background-image:
+    radial-gradient(circle at 18% 12%, rgba(124, 77, 255, 0.7) 0 1px, transparent 2px),
+    radial-gradient(circle at 58% 16%, rgba(86, 204, 242, 0.85) 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 38%, rgba(242, 234, 255, 0.65) 0 1px, transparent 2px),
+    radial-gradient(circle at 34% 78%, rgba(182, 109, 255, 0.7) 0 1px, transparent 2px);
+}
+
 /* -------------------------------------------------------------- character */
 #pet {
   position: absolute;
@@ -85,6 +95,10 @@ body[data-theme='darth-vader'] #stage::before {
 #pet.offstage {
   transform: translateX(230px);
   opacity: 0;
+}
+
+#pet.slow-fade {
+  transition: transform 1.15s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 1.15s ease;
 }
 
 /* A gentle up/down bob while she is moving. */
@@ -112,6 +126,14 @@ body[data-theme='darth-vader'] #stage::before {
 /* She turns to face the way she's walking (right, as she exits). */
 #pet.face-right img {
   transform: scaleX(-1);
+}
+
+body[data-theme='wizard'] #pet img {
+  transform: scaleX(-1);
+}
+
+body[data-theme='wizard'] #pet.face-right img {
+  transform: scaleX(1);
 }
 
 /* Little happy hop when she confirms. */
