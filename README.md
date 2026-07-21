@@ -18,7 +18,7 @@ configuration to make the reminders feel personal.
 - Sleep/wake-aware scheduler so reminders recover after the laptop resumes.
 - Theme-specific colors, copy, tray icons, and character sprites.
 - Animated sprite support for richer themes such as `Wizard`.
-- Local/friends build scripts plus stricter signed release scripts.
+- Local macOS packaging for testing and personal use.
 
 ## Themes
 
@@ -86,51 +86,27 @@ npm run dev
 The dev runner watches `main.js`, `preload.js`, `renderer/`, `assets/`, and
 `package.json`.
 
-## Building
+## Local Builds
 
-For a local macOS test build without distribution signing:
-
-```bash
-npm run dist:mac:dev
-```
-
-For a direct Apple Silicon build to share with trusted friends:
-
-```bash
-npm run dist:mac:friends
-```
-
-That produces:
-
-```text
-dist/HydrateBuddy-0.1.0-arm64.dmg
-```
-
-For a universal Intel plus Apple Silicon friend build:
-
-```bash
-npm run dist:mac:friends:universal
-```
-
-Friend builds are ad-hoc signed and not notarized, so macOS may show a first-run
-warning. Public release builds should use a Developer ID Application certificate
-and Apple notarization.
-
-For a signed/notarized macOS release:
+Build an Apple Silicon macOS package:
 
 ```bash
 npm run dist:mac
 ```
 
-For a draft GitHub release:
+That produces a DMG and zip in `dist/`.
+
+Build a universal macOS package:
 
 ```bash
-export GH_TOKEN=ghp_your_token
-npm run release:github
+npm run dist:mac:universal
 ```
 
-The release scripts intentionally block unsafe public builds when the required
-Developer ID and notarization credentials are missing.
+Build a Windows installer:
+
+```bash
+npm run dist:win
+```
 
 ## Project Layout
 
@@ -140,12 +116,12 @@ preload.js                  Safe IPC bridge for the renderer
 renderer/                   Popup UI, settings UI, animations
 shared/themes.js            Theme registry, colors, copy, animation metadata
 assets/themes/              Character sprites and tray icons by theme
-scripts/                    Release checks and asset extraction helpers
+scripts/                    Dev runner, package checks, asset extraction helpers
 build/                      macOS entitlements and app icon
 ```
 
 ## Asset Notes
 
-Hydrate Buddy supports fan-style and custom themes, but distributed builds should
-only include assets you have the right to share. The app code is MIT licensed;
+Hydrate Buddy supports fan-style and custom themes. If you add new assets, use
+images you have the right to keep in the project. The app code is MIT licensed;
 individual image assets may have their own usage terms.

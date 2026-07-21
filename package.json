@@ -12,13 +12,13 @@
     "start": "electron .",
     "dev": "node scripts/dev.mjs",
     "dist": "npm run dist:mac",
-    "dist:mac": "npm run release:mac",
-    "dist:mac:dev": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never -c.mac.forceCodeSigning=false -c.mac.identity=null -c.mac.notarize=false",
-    "dist:mac:friends": "npm run dist:mac:friends:m4",
-    "dist:mac:friends:m4": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never -c.mac.forceCodeSigning=false -c.mac.identity=- -c.mac.notarize=false -c.mac.hardenedRuntime=false -c.mac.gatekeeperAssess=false && node scripts/verify-mac-menu-bar.mjs",
-    "dist:mac:friends:universal": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --universal --publish never -c.mac.forceCodeSigning=false -c.mac.identity=- -c.mac.notarize=false -c.mac.hardenedRuntime=false -c.mac.gatekeeperAssess=false && node scripts/verify-mac-menu-bar.mjs",
-    "release:mac": "node scripts/assert-mac-release-env.mjs && electron-builder --mac dmg zip --publish never && node scripts/verify-mac-release.mjs",
-    "release:github": "node scripts/assert-mac-release-env.mjs && node scripts/assert-github-release-env.mjs && electron-builder --mac dmg zip --publish always && node scripts/verify-mac-release.mjs",
+    "dist:mac": "npm run dist:mac:arm64",
+    "dist:mac:dev": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip",
+    "dist:mac:arm64": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 && node scripts/verify-mac-menu-bar.mjs",
+    "dist:mac:universal": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --universal && node scripts/verify-mac-menu-bar.mjs",
+    "dist:mac:friends": "npm run dist:mac:arm64",
+    "dist:mac:friends:m4": "npm run dist:mac:arm64",
+    "dist:mac:friends:universal": "npm run dist:mac:universal",
     "dist:win": "electron-builder --win nsis"
   },
   "keywords": [
@@ -54,7 +54,6 @@
       "icon": "build/icon.png"
     },
     "mac": {
-      "type": "distribution",
       "target": [
         "dmg",
         "zip"
@@ -62,25 +61,14 @@
       "icon": "build/icon.png",
       "category": "public.app-category.healthcare-fitness",
       "artifactName": "HydrateBuddy-${version}-${arch}.${ext}",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": true,
-      "strictVerify": true,
-      "forceCodeSigning": true,
-      "notarize": true,
+      "identity": null,
+      "forceCodeSigning": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "extendInfo": {
         "LSUIElement": true
       }
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "jocsas",
-        "repo": "drink-water-buddy",
-        "releaseType": "draft"
-      }
-    ],
     "nsis": {
       "oneClick": false,
       "perMachine": false,
