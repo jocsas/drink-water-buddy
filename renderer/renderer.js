@@ -1,7 +1,6 @@
 const pet = document.getElementById('pet');
 const spriteIdle = document.getElementById('sprite-idle');
 const spriteDrinking = document.getElementById('sprite-drinking');
-const spriteDroid = document.getElementById('sprite-droid');
 const bubble = document.getElementById('bubble');
 const bubbleText = document.getElementById('bubble-text');
 const buttons = document.getElementById('buttons');
@@ -49,6 +48,7 @@ function applyTheme(themeId) {
 
   yesBtn.textContent = activeTheme.buttons.yes;
   snoozeBtn.textContent = activeTheme.buttons.snooze;
+  updateSprites();
   showDrinking(false);
 }
 
@@ -77,13 +77,43 @@ function wait(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function showDrinking(on) {
-  const useDroid = activeTheme.character === 'droid';
+function themeSpritePath(theme, state) {
+  return `../${theme.assetFolder}/${state}.png`;
+}
 
-  spriteIdle.classList.toggle('hidden', useDroid || on);
-  spriteDrinking.classList.toggle('hidden', useDroid || !on);
-  spriteDroid.classList.toggle('hidden', !useDroid);
-  spriteDroid.classList.toggle('is-drinking', useDroid && on);
+function uniqueSources(sources) {
+  return sources.filter((src, index) => src && sources.indexOf(src) === index);
+}
+
+function setSprite(img, sources) {
+  const candidates = uniqueSources(sources);
+  if (img.dataset.currentSrc === candidates[0]) return;
+
+  let index = 0;
+  img.onerror = () => {
+    index += 1;
+    if (!candidates[index]) return;
+    img.dataset.currentSrc = candidates[index];
+    img.src = candidates[index];
+  };
+  img.dataset.currentSrc = candidates[0];
+  img.src = candidates[0];
+}
+
+function updateSprites() {
+  const defaultTheme = window.HYDRATE_THEMES.default;
+  const idleFallback = themeSpritePath(defaultTheme, 'idle');
+  const drinkingFallback = themeSpritePath(defaultTheme, 'drinking');
+  const idlePath = themeSpritePath(activeTheme, 'idle');
+  const drinkingPath = themeSpritePath(activeTheme, 'drinking');
+
+  setSprite(spriteIdle, [idlePath, idleFallback]);
+  setSprite(spriteDrinking, [drinkingPath, idlePath, drinkingFallback, idleFallback]);
+}
+
+function showDrinking(on) {
+  spriteIdle.classList.toggle('hidden', on);
+  spriteDrinking.classList.toggle('hidden', !on);
 }
 
 // ------------------------------------------------------------ walk in / out

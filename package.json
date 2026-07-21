@@ -45,9 +45,7 @@
       "preload.js",
       "shared/**/*",
       "renderer/**/*",
-      "assets/idle.png",
-      "assets/drinking.png",
-      "assets/tray.png"
+      "assets/themes/**/*"
     ],
     "win": {
       "target": [

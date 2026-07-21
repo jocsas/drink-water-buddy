@@ -16,6 +16,9 @@ const EDGE_MARGIN = 8;
 const INTERVAL_OPTIONS = [15, 30, 45, 60, 90, 120];
 const SNOOZE_OPTIONS = [5, 10, 15, 20, 30];
 const THEME_IDS = Object.keys(THEMES);
+const THEME_ALIASES = {
+  starwars: 'baby-yoda',
+};
 // --------------------------------------------------------------------------
 
 let win = null;
@@ -69,7 +72,8 @@ function clampNumber(value, fallback, min, max) {
 
 function normalizeSettings(raw = {}) {
   const cfg = raw && typeof raw === 'object' ? raw : {};
-  const themeId = THEME_IDS.includes(cfg.themeId) ? cfg.themeId : 'default';
+  const rawThemeId = THEME_ALIASES[cfg.themeId] || cfg.themeId;
+  const themeId = THEME_IDS.includes(rawThemeId) ? rawThemeId : 'default';
 
   return {
     name: String(cfg.name || '').trim().slice(0, 24),
@@ -112,6 +116,7 @@ function applySettings(nextSettings, opts = {}) {
   }
 
   updateTrayTooltip();
+  updateTrayIcon();
   if (tray) rebuildTrayMenu();
   sendSettingsToWindows();
   return settings;
@@ -119,6 +124,27 @@ function applySettings(nextSettings, opts = {}) {
 
 function themeLabel(themeId = settings.themeId) {
   return THEMES[themeId]?.label || THEMES.default.label;
+}
+
+function themeFor(themeId = settings.themeId) {
+  return THEMES[themeId] || THEMES.default;
+}
+
+function themeTrayIconPath(themeId = settings.themeId) {
+  const primaryPath = path.join(__dirname, themeFor(themeId).assetFolder, 'tray.png');
+  if (fs.existsSync(primaryPath)) return primaryPath;
+  return path.join(__dirname, THEMES.default.assetFolder, 'tray.png');
+}
+
+function trayIconForTheme(themeId = settings.themeId) {
+  let icon = nativeImage.createFromPath(themeTrayIconPath(themeId));
+  if (icon.isEmpty()) icon = nativeImage.createEmpty();
+  return icon;
+}
+
+function updateTrayIcon() {
+  if (!tray) return;
+  tray.setImage(trayIconForTheme());
 }
 
 /** Current wall-clock in IST, independent of the machine's own timezone. */
@@ -265,18 +291,14 @@ function openSettingsWindow() {
 }
 
 function createTray() {
-  const iconPath = path.join(__dirname, 'assets', 'tray.png');
-  let icon = nativeImage.createFromPath(iconPath);
-  if (icon.isEmpty()) icon = nativeImage.createEmpty();
-
-  tray = new Tray(icon);
+  tray = new Tray(trayIconForTheme());
   rebuildTrayMenu();
   tray.setToolTip('Hydrate Buddy');
   tray.on('click', () => triggerReminder());
 }
 
 function rebuildTrayMenu() {
-  const activeTheme = THEMES[settings.themeId] || THEMES.default;
+  const activeTheme = themeFor();
   const template = [
     { label: `${activeTheme.trayDrinkLabel} 💧`, click: () => triggerReminder() },
     {

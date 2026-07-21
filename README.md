@@ -33,9 +33,25 @@ No menu da barra do topo, use `Settings...` para ajustar:
 - tema visual.
 
 O menu tambem tem atalhos para mudar rapidamente intervalo, snooze e tema. Por
-enquanto existem dois temas: `Default doll` e `Star Wars-inspired`. O tema
-galactico usa cores, frases e um personagem proprio em CSS/HTML, sem assets
-oficiais de franquia.
+enquanto existem tres temas: `Default doll`, `Baby Yoda` e `Darth Vader`.
+
+As imagens dos personagens ficam separadas por tema:
+
+```text
+assets/themes/default/idle.png
+assets/themes/default/drinking.png
+assets/themes/default/tray.png
+assets/themes/baby-yoda/idle.png
+assets/themes/baby-yoda/drinking.png
+assets/themes/baby-yoda/tray.png
+assets/themes/darth-vader/idle.png
+assets/themes/darth-vader/drinking.png
+assets/themes/darth-vader/tray.png
+```
+
+O `tray.png` e opcional em temas novos. Se faltar, o app usa o icone do tema
+default. Enquanto um tema nao tiver `drinking.png`, o app usa `idle.png` como
+fallback temporario.
 
 ## Gerar o app para macOS
 
@@ -117,7 +133,7 @@ npm run dist:win
 - `preload.js`: ponte segura entre Electron e a interface.
 - `renderer/`: personagem, balão, configurações e interações.
 - `shared/themes.js`: definição dos temas disponíveis no app.
-- `assets/`: imagens usadas pelo app.
+- `assets/themes/<tema>/`: imagens padronizadas de cada tema.
 - `build/icon.png`: ícone do aplicativo.
 
 O projeto mantém a licença MIT da base reaproveitada. Antes de publicar, troque
