@@ -170,6 +170,9 @@ fn snooze_delay_ms(s: &Settings) -> i64 {
 }
 
 fn is_within_active_hours() -> bool {
+    if cfg!(debug_assertions) {
+        return true;
+    }
     let hour = Local::now().hour();
     (ACTIVE_START_HOUR..ACTIVE_END_HOUR).contains(&hour)
 }
