@@ -64,10 +64,6 @@ fn resolve_theme(raw: &str) -> String {
     }
 }
 
-fn clamp_num(value: i64, _fallback: i64, min: i64, max: i64) -> i64 {
-    value.clamp(min, max)
-}
-
 // ---- Settings ------------------------------------------------------------
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -411,7 +407,9 @@ fn trigger_reminder(app: &AppHandle) {
         log::warn!("failed to keep reminder on top: {e}");
     }
     let payload = state.settings.lock().clone();
-    let _ = app.emit("reminder:show", &payload);
+    if let Err(e) = app.emit_to("reminder", "reminder:show", &payload) {
+        log::warn!("failed to emit reminder:show: {e}");
+    }
     update_tray_tooltip(app);
 }
 
@@ -444,10 +442,10 @@ fn apply_settings(app: &AppHandle, patch: SettingsPatch, reschedule: bool) -> Se
             s.name = trimmed.chars().take(24).collect();
         }
         if let Some(v) = patch.interval_min {
-            s.interval_min = clamp_num(v, DEFAULT_INTERVAL_MIN, 1, 240);
+            s.interval_min = v.clamp(1, 240);
         }
         if let Some(v) = patch.snooze_min {
-            s.snooze_min = clamp_num(v, DEFAULT_SNOOZE_MIN, 1, 120);
+            s.snooze_min = v.clamp(1, 120);
         }
         if let Some(v) = patch.theme_id {
             s.theme_id = resolve_theme(&v);

@@ -17,11 +17,6 @@
     getSettings: () => invoke('settings_get'),
     saveSettings: (value) => invoke('settings_save', { value }),
     closeSettingsWindow: () => invoke('settings_close'),
-
-    // Backwards-compatible name helpers (reuse settings storage).
-    getName: async () => (await invoke('settings_get')).name,
-    saveName: async (value) => (await invoke('settings_save', { value: { name: value } })).name,
-    closeNameWindow: () => invoke('settings_close'),
   };
 
   window.hydrate = api;
