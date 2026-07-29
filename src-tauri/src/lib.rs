@@ -1,7 +1,7 @@
 // Hydrate Buddy — Tauri port of the Electron app.
 // Equivalent of main.js: config persistence, scheduler, tray, windows, IPC.
 
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use chrono::{Local, Timelike};
@@ -12,6 +12,7 @@ use tauri::{
     Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder, Wry,
 };
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri_plugin_log::{Target, TargetKind};
 
 // ---- Configuration -------------------------------------------------------
 const ACTIVE_START_HOUR: u32 = 10;
@@ -136,19 +137,25 @@ fn load_config(app: &AppHandle) -> Settings {
 }
 
 fn save_config(app: &AppHandle, settings: &Settings) {
-    if let Some(path) = config_file(app) {
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+    let Some(path) = config_file(app) else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            log::warn!("failed to create config dir {parent:?}: {e}");
         }
-        let json = serde_json::json!({
-            "name": settings.name,
-            "intervalMin": settings.interval_min,
-            "snoozeMin": settings.snooze_min,
-            "themeId": settings.theme_id,
-        });
-        if let Ok(text) = serde_json::to_string_pretty(&json) {
-            let _ = std::fs::write(path, text);
-        }
+    }
+    let json = serde_json::json!({
+        "name": settings.name,
+        "intervalMin": settings.interval_min,
+        "snoozeMin": settings.snooze_min,
+        "themeId": settings.theme_id,
+    });
+    let Ok(text) = serde_json::to_string_pretty(&json) else {
+        return;
+    };
+    if let Err(e) = std::fs::write(&path, text) {
+        log::warn!("failed to write config {path:?}: {e}");
     }
 }
 
@@ -210,15 +217,17 @@ fn open_settings(app: &AppHandle) {
         let _ = win.set_focus();
         return;
     }
-    let _ = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+    if let Err(e) = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
         .inner_size(430.0, 470.0)
         .title("Hydrate Buddy Settings")
         .resizable(false)
         .maximizable(false)
         .minimizable(false)
         .skip_taskbar(true)
-        .always_on_top(true)
-        .build();
+        .build()
+    {
+        log::error!("failed to open settings window: {e}");
+    }
 }
 
 // ---- Tray ----------------------------------------------------------------
@@ -236,8 +245,8 @@ fn tray_icon_for(theme_id: &str) -> Image<'static> {
 
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let state = app.state::<AppState>();
-    let settings = state.settings.lock().unwrap().clone();
-    let paused = *state.paused.lock().unwrap();
+    let settings = state.settings.lock().clone();
+    let paused = *state.paused.lock();
 
     let drink = MenuItem::with_id(app, "drink", "Drink now 💧", true, None::<&str>)?;
     let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
@@ -342,10 +351,17 @@ fn rebuild_tray(app: &AppHandle) {
         return;
     };
     let state = app.state::<AppState>();
-    let settings = state.settings.lock().unwrap().clone();
-    let _ = tray.set_icon(Some(tray_icon_for(&settings.theme_id)));
-    if let Ok(menu) = build_menu(app) {
-        let _ = tray.set_menu(Some(menu));
+    let settings = state.settings.lock().clone();
+    if let Err(e) = tray.set_icon(Some(tray_icon_for(&settings.theme_id))) {
+        log::warn!("failed to set tray icon: {e}");
+    }
+    match build_menu(app) {
+        Ok(menu) => {
+            if let Err(e) = tray.set_menu(Some(menu)) {
+                log::warn!("failed to set tray menu: {e}");
+            }
+        }
+        Err(e) => log::warn!("failed to build tray menu: {e}"),
     }
     update_tray_tooltip(app);
 }
@@ -355,13 +371,13 @@ fn update_tray_tooltip(app: &AppHandle) {
         return;
     };
     let state = app.state::<AppState>();
-    let paused = *state.paused.lock().unwrap();
+    let paused = *state.paused.lock();
     let tip = if paused {
         "Hydrate Buddy — paused".to_string()
     } else {
-        let next = *state.next_reminder_at.lock().unwrap();
+        let next = *state.next_reminder_at.lock();
         let mins = (((next - now_ms()) / 60_000).max(0)).max(0);
-        let s = state.settings.lock().unwrap().clone();
+        let s = state.settings.lock().clone();
         format!("Hydrate Buddy — {} — next nudge in ~{} min", theme_label(&s.theme_id), mins)
     };
     let _ = tray.set_tooltip(Some(&tip));
@@ -370,7 +386,7 @@ fn update_tray_tooltip(app: &AppHandle) {
 // ---- Core reminder flow --------------------------------------------------
 fn trigger_reminder(app: &AppHandle) {
     let state = app.state::<AppState>();
-    if *state.paused.lock().unwrap() {
+    if *state.paused.lock() {
         return;
     }
     if !is_within_active_hours() {
@@ -383,21 +399,25 @@ fn trigger_reminder(app: &AppHandle) {
         return;
     }
     {
-        let s = state.settings.lock().unwrap().clone();
-        let mut next = state.next_reminder_at.lock().unwrap();
+        let s = state.settings.lock().clone();
+        let mut next = state.next_reminder_at.lock();
         *next = now_ms() + reminder_delay_ms(&s);
     }
     position_window(app);
-    let _ = win.show();
-    let _ = win.set_always_on_top(true);
-    let payload = state.settings.lock().unwrap().clone();
+    if let Err(e) = win.show() {
+        log::warn!("failed to show reminder window: {e}");
+    }
+    if let Err(e) = win.set_always_on_top(true) {
+        log::warn!("failed to keep reminder on top: {e}");
+    }
+    let payload = state.settings.lock().clone();
     let _ = app.emit("reminder:show", &payload);
     update_tray_tooltip(app);
 }
 
 fn tick(app: &AppHandle) {
     let state = app.state::<AppState>();
-    if *state.paused.lock().unwrap() {
+    if *state.paused.lock() {
         return;
     }
     let Some(win) = app.get_webview_window("reminder") else {
@@ -409,7 +429,7 @@ fn tick(app: &AppHandle) {
     if !is_within_active_hours() {
         return;
     }
-    let next = *state.next_reminder_at.lock().unwrap();
+    let next = *state.next_reminder_at.lock();
     if now_ms() >= next {
         trigger_reminder(app);
     }
@@ -418,7 +438,7 @@ fn tick(app: &AppHandle) {
 fn apply_settings(app: &AppHandle, patch: SettingsPatch, reschedule: bool) -> Settings {
     let state = app.state::<AppState>();
     {
-        let mut s = state.settings.lock().unwrap();
+        let mut s = state.settings.lock();
         if let Some(v) = patch.name {
             let trimmed = v.trim();
             s.name = trimmed.chars().take(24).collect();
@@ -433,10 +453,10 @@ fn apply_settings(app: &AppHandle, patch: SettingsPatch, reschedule: bool) -> Se
             s.theme_id = resolve_theme(&v);
         }
     }
-    let snapshot = state.settings.lock().unwrap().clone();
+    let snapshot = state.settings.lock().clone();
     save_config(app, &snapshot);
     if reschedule {
-        let mut next = state.next_reminder_at.lock().unwrap();
+        let mut next = state.next_reminder_at.lock();
         *next = now_ms() + reminder_delay_ms(&snapshot);
     }
     let _ = app.emit("settings:updated", &snapshot);
@@ -447,7 +467,7 @@ fn apply_settings(app: &AppHandle, patch: SettingsPatch, reschedule: bool) -> Se
 // ---- IPC commands --------------------------------------------------------
 #[tauri::command]
 fn settings_get(state: State<'_, AppState>) -> Settings {
-    state.settings.lock().unwrap().clone()
+    state.settings.lock().clone()
 }
 
 #[tauri::command]
@@ -458,16 +478,16 @@ fn settings_save(value: SettingsPatch, app: AppHandle) -> Settings {
 #[tauri::command]
 fn reminder_yes(app: AppHandle) {
     let state = app.state::<AppState>();
-    let s = state.settings.lock().unwrap().clone();
-    *state.next_reminder_at.lock().unwrap() = now_ms() + reminder_delay_ms(&s);
+    let s = state.settings.lock().clone();
+    *state.next_reminder_at.lock() = now_ms() + reminder_delay_ms(&s);
     update_tray_tooltip(&app);
 }
 
 #[tauri::command]
 fn reminder_snooze(app: AppHandle) {
     let state = app.state::<AppState>();
-    let s = state.settings.lock().unwrap().clone();
-    *state.next_reminder_at.lock().unwrap() = now_ms() + snooze_delay_ms(&s);
+    let s = state.settings.lock().clone();
+    *state.next_reminder_at.lock() = now_ms() + snooze_delay_ms(&s);
     update_tray_tooltip(&app);
 }
 
@@ -492,7 +512,7 @@ fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
         "settings" | "custom_int" | "custom_snz" | "name" => open_settings(app),
         "pause" => {
             let state = app.state::<AppState>();
-            let mut paused = state.paused.lock().unwrap();
+            let mut paused = state.paused.lock();
             *paused = !*paused;
             let now_paused = *paused;
             drop(paused);
@@ -501,8 +521,8 @@ fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
                     let _ = win.hide();
                 }
             } else {
-                let s = state.settings.lock().unwrap().clone();
-                let mut next = state.next_reminder_at.lock().unwrap();
+                let s = state.settings.lock().clone();
+                let mut next = state.next_reminder_at.lock();
                 *next = now_ms() + reminder_delay_ms(&s);
             }
             rebuild_tray(app);
@@ -556,7 +576,15 @@ fn configure_mac_menu_bar_mode(_app: &AppHandle) {}
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .targets([
+                    Target::new(TargetKind::Stdout),
+                    Target::new(TargetKind::LogDir { file_name: None }),
+                ])
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             settings_get,
             settings_save,
@@ -586,7 +614,7 @@ pub fn run() {
 
             create_reminder_window(&app_handle)?;
 
-            let _ = TrayIconBuilder::with_id("main")
+            if let Err(e) = TrayIconBuilder::with_id("main")
                 .icon(tray_icon_for("default"))
                 .tooltip("Hydrate Buddy")
                 .on_tray_icon_event(|tray, event| {
@@ -599,7 +627,10 @@ pub fn run() {
                         trigger_reminder(tray.app_handle());
                     }
                 })
-                .build(app);
+                .build(app)
+            {
+                log::error!("failed to build tray icon: {e}");
+            }
 
             rebuild_tray(&app_handle);
 
