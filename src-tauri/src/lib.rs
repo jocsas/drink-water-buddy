@@ -4,8 +4,7 @@
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use chrono::Utc;
-use chrono_tz::Asia::Kolkata;
+use chrono::{Local, Timelike};
 use serde::{Deserialize, Serialize};
 use tauri::{
     image::Image, menu::CheckMenuItem, menu::IsMenuItem, menu::Menu, menu::MenuEvent,
@@ -168,13 +167,8 @@ fn snooze_delay_ms(s: &Settings) -> i64 {
 }
 
 fn is_within_active_hours() -> bool {
-    let hour: u32 = Utc::now()
-        .with_timezone(&Kolkata)
-        .format("%H")
-        .to_string()
-        .parse()
-        .unwrap_or(0);
-    hour >= ACTIVE_START_HOUR && hour < ACTIVE_END_HOUR
+    let hour = Local::now().hour();
+    (ACTIVE_START_HOUR..ACTIVE_END_HOUR).contains(&hour)
 }
 
 // ---- Window helpers ------------------------------------------------------

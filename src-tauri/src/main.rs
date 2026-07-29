@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    hydrate_tauri_test_lib::run()
+    hydrate_buddy_lib::run()
 }
