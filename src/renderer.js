@@ -83,7 +83,7 @@ function wait(ms) {
 }
 
 function themeAssetPath(theme, file) {
-  return `../${theme.assetFolder}/${file}`;
+  return `${theme.assetFolder}/${file}`;
 }
 
 function themeSpritePath(theme, state) {

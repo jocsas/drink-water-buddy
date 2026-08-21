@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
 * {
   margin: 0;
   padding: 0;
@@ -88,7 +86,6 @@ body[data-theme='wizard'] #stage::before {
   transition: transform 1.15s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.4s ease;
   transform: translateX(0);
   opacity: 1;
-  filter: drop-shadow(0 6px 6px var(--pet-shadow));
 }
 
 /* Off to the right, ready to walk in. */
@@ -168,7 +165,6 @@ body[data-theme='wizard'] #pet.face-right img {
   border: 4px solid var(--bubble-border);
   border-radius: 6px;
   padding: 16px 16px 14px;
-  box-shadow: 6px 6px 0 var(--bubble-shadow);
   transform-origin: bottom right;
   transition: transform 0.28s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.2s ease;
 }
