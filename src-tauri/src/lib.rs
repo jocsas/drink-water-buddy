@@ -197,16 +197,22 @@ fn position_window(app: &AppHandle) {
 }
 
 fn create_reminder_window(app: &AppHandle) -> tauri::Result<()> {
-    WebviewWindowBuilder::new(app, "reminder", WebviewUrl::App("index.html".into()))
-        .inner_size(WIN_WIDTH as f64, WIN_HEIGHT as f64)
-        .transparent(true)
-        .decorations(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .visible(false)
-        .focused(false)
-        .build()?;
+    let builder =
+        WebviewWindowBuilder::new(app, "reminder", WebviewUrl::App("index.html".into()))
+            .inner_size(WIN_WIDTH as f64, WIN_HEIGHT as f64)
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .visible(false)
+            .focused(false);
+    // Per-pixel transparency: WebKitGTK cannot reliably sync transparent
+    // window surfaces on X11 (ghost trails behind every moving element,
+    // NVIDIA proprietary driver in particular). Keep the floating look only
+    // where it works; Linux renders an opaque, styled card instead.
+    #[cfg(not(target_os = "linux"))]
+    let builder = builder.transparent(true);
+    builder.build()?;
     Ok(())
 }
 

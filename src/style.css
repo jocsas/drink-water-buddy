@@ -37,6 +37,17 @@ body {
   --button-letter-spacing: 0.5px;
 }
 
+/* Linux: the reminder window is opaque (see index.html), so style it as a
+   framed pixel-art card matching the bubble's chunky-border aesthetic. */
+html.card body,
+html.card #stage {
+  background: #f2efe4;
+}
+
+html.card #stage {
+  border: 4px solid #1c1c1c;
+}
+
 body[data-theme='baby-yoda'] #stage::before,
 body[data-theme='darth-vader'] #stage::before,
 body[data-theme='wizard'] #stage::before {
