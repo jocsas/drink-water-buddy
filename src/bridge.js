@@ -9,6 +9,8 @@
       listen('reminder:show', (event) => cb(event.payload || {})),
     onSettingsUpdated: (cb) =>
       listen('settings:updated', (event) => cb(event.payload || {})),
+    onSettingsFocus: (cb) =>
+      listen('settings:focus', (event) => cb(event.payload || 'name')),
 
     yes: () => invoke('reminder_yes'),
     snooze: () => invoke('reminder_snooze'),

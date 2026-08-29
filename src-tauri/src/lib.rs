@@ -6,12 +6,12 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use chrono::{Local, Timelike};
 use serde::{Deserialize, Serialize};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
     image::Image, menu::CheckMenuItem, menu::IsMenuItem, menu::Menu, menu::MenuEvent,
-    menu::MenuItem, menu::PredefinedMenuItem, menu::Submenu, AppHandle,
-    Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder, Wry,
+    menu::MenuItem, menu::PredefinedMenuItem, menu::Submenu, AppHandle, Emitter, Manager,
+    PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder, Wry,
 };
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_log::{Target, TargetKind};
 
 // ---- Configuration -------------------------------------------------------
@@ -21,6 +21,7 @@ const DEFAULT_INTERVAL_MIN: i64 = 45;
 const DEFAULT_SNOOZE_MIN: i64 = 10;
 const GREETING_DELAY_MS: i64 = 6000;
 const TICK_MS: u64 = 30000;
+const FORCED_DRINK_SNOOZE_LIMIT: u8 = 3;
 
 const WIN_WIDTH: i32 = 360;
 const WIN_HEIGHT: i32 = 430;
@@ -98,6 +99,51 @@ struct SettingsPatch {
     theme_id: Option<String>,
 }
 
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ReminderPayload {
+    name: String,
+    interval_min: i64,
+    snooze_min: i64,
+    theme_id: String,
+    snooze_count: u8,
+    forced_drink: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct SnoozeOutcome {
+    snooze_count: u8,
+    forced_drink: bool,
+    snooze_min: i64,
+}
+
+fn should_force_drink(snooze_count: u8) -> bool {
+    snooze_count >= FORCED_DRINK_SNOOZE_LIMIT
+}
+
+fn next_snooze_count(current: u8) -> u8 {
+    current.saturating_add(1).min(FORCED_DRINK_SNOOZE_LIMIT)
+}
+
+fn reminder_payload(settings: Settings, snooze_count: u8) -> ReminderPayload {
+    ReminderPayload {
+        name: settings.name,
+        interval_min: settings.interval_min,
+        snooze_min: settings.snooze_min,
+        theme_id: settings.theme_id,
+        snooze_count,
+        forced_drink: should_force_drink(snooze_count),
+    }
+}
+
+fn patch_changes_interval(settings: &Settings, patch: &SettingsPatch) -> bool {
+    patch
+        .interval_min
+        .map(|value| value.clamp(1, 240) != settings.interval_min)
+        .unwrap_or(false)
+}
+
 fn config_file(app: &AppHandle) -> Option<std::path::PathBuf> {
     let dir = app.path().app_config_dir().ok()?;
     Some(dir.join("hydrate-buddy").join("config.json"))
@@ -160,6 +206,7 @@ struct AppState {
     settings: Mutex<Settings>,
     paused: Mutex<bool>,
     next_reminder_at: Mutex<i64>,
+    consecutive_snoozes: Mutex<u8>,
 }
 
 fn reminder_delay_ms(s: &Settings) -> i64 {
@@ -191,7 +238,8 @@ fn position_window(app: &AppHandle) {
         let win_w_phys = WIN_WIDTH as f64 * scale;
         let win_h_phys = WIN_HEIGHT as f64 * scale;
         let x = (area.position.x + area.size.width as i32) as f64 - win_w_phys - EDGE_MARGIN as f64;
-        let y = (area.position.y + area.size.height as i32) as f64 - win_h_phys - EDGE_MARGIN as f64;
+        let y =
+            (area.position.y + area.size.height as i32) as f64 - win_h_phys - EDGE_MARGIN as f64;
         let _ = win.set_position(PhysicalPosition::new(x as i32, y as i32));
     }
 }
@@ -211,19 +259,37 @@ fn create_reminder_window(app: &AppHandle) -> tauri::Result<()> {
 }
 
 fn open_settings(app: &AppHandle) {
+    open_settings_with_focus(app, None);
+}
+
+fn settings_url(focus: Option<&str>) -> &'static str {
+    match focus {
+        Some("interval") => "settings.html?focus=interval",
+        Some("snooze") => "settings.html?focus=snooze",
+        Some("theme") => "settings.html?focus=theme",
+        _ => "settings.html?focus=name",
+    }
+}
+
+fn open_settings_with_focus(app: &AppHandle, focus: Option<&str>) {
     if let Some(win) = app.get_webview_window("settings") {
         let _ = win.show();
+        let _ = win.unminimize();
         let _ = win.set_focus();
+        if let Some(target) = focus {
+            let _ = app.emit_to("settings", "settings:focus", target);
+        }
         return;
     }
-    if let Err(e) = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
-        .inner_size(430.0, 470.0)
-        .title("Hydrate Buddy Settings")
-        .resizable(false)
-        .maximizable(false)
-        .minimizable(false)
-        .skip_taskbar(true)
-        .build()
+    if let Err(e) =
+        WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(settings_url(focus).into()))
+            .inner_size(430.0, 470.0)
+            .title("Hydrate Buddy Settings")
+            .resizable(false)
+            .maximizable(false)
+            .minimizable(false)
+            .skip_taskbar(true)
+            .build()
     {
         log::error!("failed to open settings window: {e}");
     }
@@ -237,7 +303,9 @@ fn tray_icon_for(theme_id: &str) -> Image<'static> {
         "wizard" => include_bytes!("../icons/tray/wizard.png"),
         _ => include_bytes!("../icons/tray/default.png"),
     };
-    let decoded = image::load_from_memory(bytes).expect("decode tray icon").to_rgba8();
+    let decoded = image::load_from_memory(bytes)
+        .expect("decode tray icon")
+        .to_rgba8();
     let (width, height) = decoded.dimensions();
     Image::new_owned(decoded.into_raw(), width, height)
 }
@@ -323,10 +391,16 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             )
         })
         .collect::<tauri::Result<_>>()?;
-    let theme_refs: Vec<&dyn IsMenuItem<Wry>> =
-        theme_items.iter().map(|i| i as &dyn IsMenuItem<Wry>).collect();
-    let theme_sub =
-        Submenu::with_items(app, format!("Theme: {}", theme_label(&settings.theme_id)), true, &theme_refs)?;
+    let theme_refs: Vec<&dyn IsMenuItem<Wry>> = theme_items
+        .iter()
+        .map(|i| i as &dyn IsMenuItem<Wry>)
+        .collect();
+    let theme_sub = Submenu::with_items(
+        app,
+        format!("Theme: {}", theme_label(&settings.theme_id)),
+        true,
+        &theme_refs,
+    )?;
 
     let name_label = if settings.name.is_empty() {
         "Name: not set".to_string()
@@ -334,13 +408,22 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         format!("Name: {}", settings.name)
     };
     let name_item = MenuItem::with_id(app, "name", name_label, true, None::<&str>)?;
-    let pause_item = CheckMenuItem::with_id(app, "pause", "Pause reminders", true, paused, None::<&str>)?;
+    let pause_item =
+        CheckMenuItem::with_id(app, "pause", "Pause reminders", true, paused, None::<&str>)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit Hydrate Buddy", true, None::<&str>)?;
 
     let all_refs: Vec<&dyn IsMenuItem<Wry>> = vec![
-        &drink, &settings_item, &sep1, &interval_sub, &snooze_sub, &theme_sub, &name_item,
-        &pause_item, &sep2, &quit_item,
+        &drink,
+        &settings_item,
+        &sep1,
+        &interval_sub,
+        &snooze_sub,
+        &theme_sub,
+        &name_item,
+        &pause_item,
+        &sep2,
+        &quit_item,
     ];
     Menu::with_items(app, &all_refs)
 }
@@ -377,7 +460,11 @@ fn update_tray_tooltip(app: &AppHandle) {
         let next = *state.next_reminder_at.lock();
         let mins = (((next - now_ms()) / 60_000).max(0)).max(0);
         let s = state.settings.lock().clone();
-        format!("Hydrate Buddy — {} — next nudge in ~{} min", theme_label(&s.theme_id), mins)
+        format!(
+            "Hydrate Buddy — {} — next nudge in ~{} min",
+            theme_label(&s.theme_id),
+            mins
+        )
     };
     let _ = tray.set_tooltip(Some(&tip));
 }
@@ -409,7 +496,10 @@ fn trigger_reminder(app: &AppHandle) {
     if let Err(e) = win.set_always_on_top(true) {
         log::warn!("failed to keep reminder on top: {e}");
     }
-    let payload = state.settings.lock().clone();
+    let payload = reminder_payload(
+        state.settings.lock().clone(),
+        *state.consecutive_snoozes.lock(),
+    );
     if let Err(e) = app.emit_to("reminder", "reminder:show", &payload) {
         log::warn!("failed to emit reminder:show: {e}");
     }
@@ -473,23 +563,43 @@ fn settings_get(state: State<'_, AppState>) -> Settings {
 
 #[tauri::command]
 fn settings_save(value: SettingsPatch, app: AppHandle) -> Settings {
-    apply_settings(&app, value, false)
+    let current = {
+        let state = app.state::<AppState>();
+        let current = state.settings.lock().clone();
+        current
+    };
+    let reschedule = patch_changes_interval(&current, &value);
+    apply_settings(&app, value, reschedule)
 }
 
 #[tauri::command]
 fn reminder_yes(app: AppHandle) {
     let state = app.state::<AppState>();
     let s = state.settings.lock().clone();
+    *state.consecutive_snoozes.lock() = 0;
     *state.next_reminder_at.lock() = now_ms() + reminder_delay_ms(&s);
     update_tray_tooltip(&app);
 }
 
 #[tauri::command]
-fn reminder_snooze(app: AppHandle) {
+fn reminder_snooze(app: AppHandle) -> SnoozeOutcome {
     let state = app.state::<AppState>();
     let s = state.settings.lock().clone();
-    *state.next_reminder_at.lock() = now_ms() + snooze_delay_ms(&s);
+    let snooze_count = {
+        let mut count = state.consecutive_snoozes.lock();
+        *count = next_snooze_count(*count);
+        *count
+    };
+    let forced_drink = should_force_drink(snooze_count);
+    if !forced_drink {
+        *state.next_reminder_at.lock() = now_ms() + snooze_delay_ms(&s);
+    }
     update_tray_tooltip(&app);
+    SnoozeOutcome {
+        snooze_count,
+        forced_drink,
+        snooze_min: s.snooze_min,
+    }
 }
 
 #[tauri::command]
@@ -510,7 +620,9 @@ fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
     let id = event.id().as_ref();
     match id {
         "drink" => trigger_reminder(app),
-        "settings" | "custom_int" | "custom_snz" | "name" => open_settings(app),
+        "settings" | "name" => open_settings(app),
+        "custom_int" => open_settings_with_focus(app, Some("interval")),
+        "custom_snz" => open_settings_with_focus(app, Some("snooze")),
         "pause" => {
             let state = app.state::<AppState>();
             let mut paused = state.paused.lock();
@@ -611,6 +723,7 @@ pub fn run() {
                 settings: Mutex::new(settings),
                 paused: Mutex::new(false),
                 next_reminder_at: Mutex::new(next_reminder_at),
+                consecutive_snoozes: Mutex::new(0),
             });
 
             create_reminder_window(&app_handle)?;
@@ -654,4 +767,68 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snooze_counter_forces_drink_on_third_snooze() {
+        let first = next_snooze_count(0);
+        let second = next_snooze_count(first);
+        let third = next_snooze_count(second);
+
+        assert_eq!(first, 1);
+        assert_eq!(second, 2);
+        assert_eq!(third, FORCED_DRINK_SNOOZE_LIMIT);
+        assert!(!should_force_drink(first));
+        assert!(!should_force_drink(second));
+        assert!(should_force_drink(third));
+    }
+
+    #[test]
+    fn snooze_counter_stays_capped_after_limit() {
+        assert_eq!(
+            next_snooze_count(FORCED_DRINK_SNOOZE_LIMIT),
+            FORCED_DRINK_SNOOZE_LIMIT
+        );
+        assert!(should_force_drink(FORCED_DRINK_SNOOZE_LIMIT));
+    }
+
+    #[test]
+    fn reminder_payload_marks_forced_drink_from_snooze_count() {
+        let payload = reminder_payload(Settings::default(), FORCED_DRINK_SNOOZE_LIMIT);
+
+        assert!(payload.forced_drink);
+        assert_eq!(payload.snooze_count, FORCED_DRINK_SNOOZE_LIMIT);
+        assert_eq!(payload.theme_id, "default");
+    }
+
+    #[test]
+    fn settings_patch_reschedules_only_when_interval_changes() {
+        let settings = Settings::default();
+
+        assert!(!patch_changes_interval(
+            &settings,
+            &SettingsPatch {
+                name: Some("Ada".to_string()),
+                ..Default::default()
+            }
+        ));
+        assert!(!patch_changes_interval(
+            &settings,
+            &SettingsPatch {
+                interval_min: Some(DEFAULT_INTERVAL_MIN),
+                ..Default::default()
+            }
+        ));
+        assert!(patch_changes_interval(
+            &settings,
+            &SettingsPatch {
+                interval_min: Some(1),
+                ..Default::default()
+            }
+        ));
+    }
 }

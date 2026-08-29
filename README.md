@@ -31,6 +31,7 @@ fast, native app.
 - 🎨 **Four themes** — Default doll, Baby Yoda, Darth Vader, and an animated Wizard
 - 🧭 **System‑tray menu** — *Drink now*, reminder interval, snooze, theme picker, pause, quit
 - ⏱️ **Smart scheduler** — respects active hours (10:00–23:00 local) and survives sleep/wake
+- 🚫 **No endless snoozing** — after three consecutive snoozes, Snooze dodges the cursor until you drink
 - ✍️ **Personalized nudges** — set your name for messages that call you out by name
 - 💾 **Persistent settings** — your preferences are saved to disk
 - 🖥️ **Cross‑platform** — one codebase for Linux, macOS, and Windows

@@ -42,6 +42,25 @@ function fill(settings) {
   applyPreview(themeSelect.value);
 }
 
+function focusField(target) {
+  const field = {
+    interval: intervalInput,
+    snooze: snoozeInput,
+    theme: themeSelect,
+    name: nameInput,
+  }[target] || nameInput;
+
+  requestAnimationFrame(() => {
+    field.focus();
+    if (typeof field.select === 'function') field.select();
+  });
+}
+
+function initialFocusTarget() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('focus') || 'name';
+}
+
 function readForm() {
   return {
     name: nameInput.value,
@@ -59,11 +78,11 @@ async function saveSettings(event) {
 
 window.hydrate.getSettings().then((settings) => {
   fill(settings);
-  nameInput.focus();
-  nameInput.select();
+  focusField(initialFocusTarget());
 });
 
 window.hydrate.onSettingsUpdated(fill);
+window.hydrate.onSettingsFocus(focusField);
 
 themeSelect.addEventListener('change', () => applyPreview(themeSelect.value));
 form.addEventListener('submit', saveSettings);
