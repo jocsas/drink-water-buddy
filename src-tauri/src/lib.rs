@@ -493,6 +493,9 @@ fn trigger_reminder(app: &AppHandle) {
     if let Err(e) = win.show() {
         log::warn!("failed to show reminder window: {e}");
     }
+    if let Err(e) = win.set_focus() {
+        log::warn!("failed to focus reminder window: {e}");
+    }
     if let Err(e) = win.set_always_on_top(true) {
         log::warn!("failed to keep reminder on top: {e}");
     }
