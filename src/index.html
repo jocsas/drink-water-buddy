@@ -2,11 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <script>
-      // WebKitGTK can't sync per-pixel-transparent windows on X11 reliably
-      // (ghost trails); Linux renders an opaque pixel-art card instead.
-      if (/Linux/.test(navigator.platform)) document.documentElement.classList.add('card');
-    </script>
+    <script src="linux-card.js"></script>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
