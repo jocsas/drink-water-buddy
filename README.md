@@ -10,7 +10,7 @@
 [![Platforms](https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-555)](#-production-build)
 [![License](https://img.shields.io/badge/license-MIT-green)](#-license)
 
-<img src="src/assets/themes/wizard/idle.png" alt="Hydrate Buddy" width="170">
+<img src="docs/demo.gif" alt="Hydrate Buddy demo — the wizard walks in, you confirm, confetti happens" width="400">
 
 </div>
 
@@ -20,8 +20,8 @@ celebrate with confetti, then wander off until the next nudge. Four themed chara
 configurable intervals, snooze, and personalized messages — all wrapped in a single,
 fast, native app.
 
-> ℹ️ This is the **Tauri (Rust)** port, on the `tauri` branch. The `main` branch holds the
-> original Electron version.
+> ℹ️ Hydrate Buddy started life as an Electron app and was rewritten in **Tauri 2 (Rust)** —
+> same pet, a fraction of the memory. The Electron history lives on in the git log.
 
 ---
 
@@ -75,7 +75,6 @@ macOS and Windows need only the prerequisites above (Xcode CLT / Microsoft C++ B
 ```bash
 git clone git@github.com:jocsas/drink-water-buddy.git
 cd drink-water-buddy
-git checkout tauri      # the Tauri/Rust port
 ```
 
 ### 3. Install JS dependencies & run
@@ -289,10 +288,20 @@ dependencies listed in [Quick start](#1-prerequisites).
 
 This is a small, friendly project. PRs welcome!
 
-1. Fork & branch off `tauri`
+1. Fork & branch off `main`
 2. `npm install && npm run tauri dev` to verify
 3. Keep it clean — `cargo clippy` should pass with no warnings
 4. Open a pull request describing the change
+
+**Demo GIF** — after changing anything visual, re-record it with:
+
+```bash
+sudo apt-get install -y ffmpeg xdotool gifsicle   # one-time (Linux/X11)
+scripts/capture-demo.sh                            # wizard; THEME=default to swap
+```
+
+The script drives the real app (dev mode), clicks through one full reminder
+flow, and overwrites `docs/demo.gif`.
 
 ---
 
