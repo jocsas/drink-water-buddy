@@ -55,18 +55,25 @@ html.card #stage {
   bottom: 0;
   width: 155px;
   height: 272px;
+  --escape-x: 0px;
+  --escape-y: 0px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   transition: transform 1.15s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.4s ease;
-  transform: translateX(0);
+  transform: translate(var(--escape-x), var(--escape-y));
   opacity: 1;
 }
 
 /* Off to the right, ready to walk in. */
 #pet.offstage {
-  transform: translateX(230px);
+  transform: translate(calc(230px + var(--escape-x)), var(--escape-y));
   opacity: 0;
+}
+
+#pet.evading {
+  transition: transform 0.12s linear, opacity 0.4s ease;
+  will-change: transform;
 }
 
 #pet.slow-fade {
@@ -194,6 +201,10 @@ body[data-theme='wizard'] #pet.face-right img {
 }
 
 .btn {
+  --escape-x: 0px;
+  --escape-y: 0px;
+  --press-x: 0px;
+  --press-y: 0px;
   font-family: 'Press Start 2P', 'Courier New', monospace;
   font-size: var(--button-font-size);
   letter-spacing: var(--button-letter-spacing);
@@ -202,12 +213,14 @@ body[data-theme='wizard'] #pet.face-right img {
   border-radius: 4px;
   cursor: pointer;
   text-transform: uppercase;
+  transform: translate(calc(var(--escape-x) + var(--press-x)), calc(var(--escape-y) + var(--press-y)));
   transition: transform 0.05s ease, box-shadow 0.05s ease;
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
 }
 
 .btn:active {
-  transform: translate(3px, 3px);
+  --press-x: 3px;
+  --press-y: 3px;
   box-shadow: 0 0 0 rgba(0, 0, 0, 0.35);
 }
 
@@ -227,6 +240,13 @@ body[data-theme='wizard'] #pet.face-right img {
 
 .btn-snooze:hover {
   background: var(--button-snooze-hover);
+}
+
+.btn-snooze.evading {
+  position: relative;
+  z-index: 6;
+  transition: transform 0.1s linear, box-shadow 0.05s ease;
+  will-change: transform;
 }
 
 /* ---------------------------------------------------------------- confetti */

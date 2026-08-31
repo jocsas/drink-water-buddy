@@ -13,6 +13,14 @@ const confetti = document.getElementById('confetti');
 let busy = false; // ignore clicks while an animation is running
 let frameTimer = null;
 let frameAnimationToken = 0;
+let forcedHydration = false;
+let evasionFrame = null;
+let evasionWalkStop = null;
+let evasionMouse = null;
+const evasionOffsets = {
+  pet: { x: 0, y: 0 },
+  snooze: { x: 0, y: 0 },
+};
 let currentSettings = {
   name: '',
   intervalMin: 45,
@@ -33,6 +41,7 @@ const glyphs = {
 };
 
 const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 function themeFor(themeId) {
   return window.HYDRATE_THEMES[themeId] || window.HYDRATE_THEMES.default;
@@ -76,6 +85,12 @@ function cheerFor() {
   const name = currentSettings.name;
   const lines = name ? activeTheme.namedCheers : activeTheme.cheers;
   return format(pick(lines), { name, minutes: currentSettings.snoozeMin });
+}
+
+function forcedPromptFor() {
+  return currentSettings.name
+    ? `${currentSettings.name}, no more snooze. Drink water first.`
+    : 'No more snooze. Drink water first.';
 }
 
 function wait(ms) {
@@ -275,6 +290,109 @@ function showBubble(text, withButtons) {
   bubble.classList.remove('hidden');
 }
 
+// --------------------------------------------------------- forced hydration
+function setEscapeOffset(element, offset) {
+  element.style.setProperty('--escape-x', `${Math.round(offset.x)}px`);
+  element.style.setProperty('--escape-y', `${Math.round(offset.y)}px`);
+}
+
+function resetEscapeOffset(element) {
+  element.style.removeProperty('--escape-x');
+  element.style.removeProperty('--escape-y');
+}
+
+function clampOffsetToStage(element, offset, padding) {
+  const stageRect = stage.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
+  const baseLeft = rect.left - offset.x;
+  const baseRight = rect.right - offset.x;
+  const baseTop = rect.top - offset.y;
+  const baseBottom = rect.bottom - offset.y;
+
+  offset.x = clamp(offset.x, stageRect.left + padding - baseLeft, stageRect.right - padding - baseRight);
+  offset.y = clamp(offset.y, stageRect.top + padding - baseTop, stageRect.bottom - padding - baseBottom);
+}
+
+function evadeElement(element, offset, mouse, radius, push, padding) {
+  const rect = element.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const dx = centerX - mouse.x;
+  const dy = centerY - mouse.y;
+  const distance = Math.max(1, Math.hypot(dx, dy));
+
+  if (distance < radius) {
+    const intensity = (radius - distance) / radius;
+    offset.x += (dx / distance) * (push * intensity + 4);
+    offset.y += (dy / distance) * (push * intensity + 4);
+    offset.x += Math.random() * 4 - 2;
+    offset.y += Math.random() * 4 - 2;
+  } else {
+    offset.x *= 0.985;
+    offset.y *= 0.985;
+  }
+
+  clampOffsetToStage(element, offset, padding);
+  setEscapeOffset(element, offset);
+}
+
+function tickEvasion() {
+  if (!forcedHydration) return;
+  if (evasionMouse) {
+    evadeElement(pet, evasionOffsets.pet, evasionMouse, 180, 34, 8);
+    evadeElement(snoozeBtn, evasionOffsets.snooze, evasionMouse, 110, 28, 14);
+  }
+  evasionFrame = requestAnimationFrame(tickEvasion);
+}
+
+function startForcedHydration() {
+  if (forcedHydration) return;
+
+  forcedHydration = true;
+  stage.classList.add('forced-hydration');
+  pet.classList.add('evading');
+  pet.classList.add('walking');
+  snoozeBtn.classList.add('evading');
+
+  if (hasFrameAnimations()) {
+    evasionWalkStop = startFrameLoop('walk');
+  }
+
+  evasionFrame = requestAnimationFrame(tickEvasion);
+}
+
+function stopForcedHydration() {
+  if (!forcedHydration) return;
+
+  forcedHydration = false;
+  if (evasionFrame) {
+    cancelAnimationFrame(evasionFrame);
+    evasionFrame = null;
+  }
+  if (evasionWalkStop) {
+    evasionWalkStop();
+    evasionWalkStop = null;
+  }
+
+  evasionMouse = null;
+  evasionOffsets.pet = { x: 0, y: 0 };
+  evasionOffsets.snooze = { x: 0, y: 0 };
+  resetEscapeOffset(pet);
+  resetEscapeOffset(snoozeBtn);
+  stage.classList.remove('forced-hydration');
+  pet.classList.remove('evading');
+  pet.classList.remove('walking');
+  snoozeBtn.classList.remove('evading');
+  showStaticState('idle');
+}
+
+function bumpSnoozeButton() {
+  evasionOffsets.snooze.x += Math.random() < 0.5 ? -34 : 34;
+  evasionOffsets.snooze.y += Math.random() < 0.5 ? -18 : 18;
+  clampOffsetToStage(snoozeBtn, evasionOffsets.snooze, 14);
+  setEscapeOffset(snoozeBtn, evasionOffsets.snooze);
+}
+
 // -------------------------------------------------------------- celebration
 function burstConfetti() {
   const themeGlyphs = activeTheme.confettiGlyphs || window.HYDRATE_THEMES.default.confettiGlyphs;
@@ -328,15 +446,19 @@ async function celebrate() {
 async function runReminder(nextSettings) {
   if (busy) return;
   busy = true;
+  stopForcedHydration();
   applySettings(nextSettings || {});
   await walkIn();
-  showBubble(promptFor(), true);
+  const shouldForceDrink = Boolean(nextSettings && nextSettings.forcedDrink);
+  showBubble(shouldForceDrink ? forcedPromptFor() : promptFor(), true);
+  if (shouldForceDrink) startForcedHydration();
   busy = false;
 }
 
 async function onYes() {
   if (busy) return;
   busy = true;
+  stopForcedHydration();
   window.hydrate.yes(); // schedule the next nudge using the configured interval
   await celebrate();
   showBubble(activeTheme.goodbye, false);
@@ -348,8 +470,21 @@ async function onYes() {
 
 async function onSnooze() {
   if (busy) return;
+  if (forcedHydration) {
+    showBubble(forcedPromptFor(), true);
+    bumpSnoozeButton();
+    return;
+  }
+
   busy = true;
-  window.hydrate.snooze(); // come back in 10 min
+  const outcome = await window.hydrate.snooze();
+  if (outcome && outcome.forcedDrink) {
+    showBubble(forcedPromptFor(), true);
+    startForcedHydration();
+    busy = false;
+    return;
+  }
+
   const template = currentSettings.name ? activeTheme.namedSnooze : activeTheme.snooze;
   showBubble(
     format(template, { name: currentSettings.name, minutes: currentSettings.snoozeMin }),
@@ -363,6 +498,9 @@ async function onSnooze() {
 
 yesBtn.addEventListener('click', onYes);
 snoozeBtn.addEventListener('click', onSnooze);
+stage.addEventListener('mousemove', (event) => {
+  evasionMouse = { x: event.clientX, y: event.clientY };
+});
 
 // Triggered by the main process using the configured reminder interval.
 window.hydrate.getSettings().then(applySettings);
