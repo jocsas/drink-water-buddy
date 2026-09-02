@@ -56,7 +56,7 @@ Grab a ready‑made installer from the [**Releases**](https://github.com/jocsas/
 | OS | Download | Install |
 |---|---|---|
 | **Linux** | `.deb` or `.AppImage` | `sudo dpkg -i hydrate-buddy_*_amd64.deb`, or `chmod +x` the `.AppImage` and double‑click |
-| **macOS** | `.dmg` (pick `aarch64` for Apple Silicon, `x64` for Intel) | Open the `.dmg`, drag **Hydrate Buddy** to `/Applications` |
+| **macOS** | `.dmg` (universal — runs on Apple Silicon and Intel) | Open the `.dmg`, drag **Hydrate Buddy** to `/Applications` |
 | **Windows** | `.msi` or `.exe` | Run the installer |
 
 ### 🍎 macOS first run — remove the "damaged" warning
