@@ -49,6 +49,37 @@ walk / drink / cast / celebrate frame animations.
 
 ---
 
+## ⬇️ Download & install (no build needed)
+
+Grab a ready‑made installer from the [**Releases**](https://github.com/jocsas/drink-water-buddy/releases) page — no clone, no toolchain, no `npm run tauri build`.
+
+| OS | Download | Install |
+|---|---|---|
+| **Linux** | `.deb` or `.AppImage` | `sudo dpkg -i hydrate-buddy_*_amd64.deb`, or `chmod +x` the `.AppImage` and double‑click |
+| **macOS** | `.dmg` (universal — runs on Apple Silicon and Intel) | Open the `.dmg`, drag **Hydrate Buddy** to `/Applications` |
+| **Windows** | `.msi` or `.exe` | Run the installer |
+
+### 🍎 macOS first run — remove the "damaged" warning
+
+The app is not signed with an Apple Developer certificate, so macOS shows
+*“Hydrate Buddy.app is damaged and can’t be opened”* on first launch. It isn't
+actually damaged — that's just Gatekeeper's quarantine flag on downloaded apps.
+After dragging the app to `/Applications`, run once in **Terminal**:
+
+```bash
+xattr -cr "/Applications/Hydrate Buddy.app"
+```
+
+Then open the app normally. Only ever do this for software you trust.
+(Proper signing + notarization is on the [Roadmap](#-roadmap--known-issues).)
+
+### 🪟 Windows first run
+
+SmartScreen may show *"Windows protected your PC"* — click **More info → Run anyway**
+(app is unsigned).
+
+---
+
 ## 📦 Quick start (development)
 
 ### 1. Prerequisites
@@ -121,6 +152,9 @@ Artifacts land in `src-tauri/target/release/bundle/`:
 | **Windows** | `.msi` and `.exe` (NSIS installer) |
 
 > Build on each target platform for best results — cross‑compiling Tauri apps is non‑trivial.
+> Or skip it entirely: pushing a `v*` tag triggers the [Release workflow](.github/workflows/release.yml),
+> which builds all three platforms on GitHub Actions and uploads the installers to
+> [Releases](https://github.com/jocsas/drink-water-buddy/releases) automatically.
 
 **Install:**
 - **Linux** — `sudo dpkg -i hydrate-buddy_*_amd64.deb`, or make the `.AppImage` executable
@@ -279,6 +313,8 @@ dependencies listed in [Quick start](#1-prerequisites).
 ## 🗺️ Roadmap / known issues
 
 - [ ] Fix Linux transparent‑window animation trails (canvas/repaint approach)
+- [ ] Sign + notarize macOS builds (removes the `xattr` workaround)
+- [ ] Code‑sign Windows builds (removes the SmartScreen warning)
 - [ ] Add **Start at login** tray toggle via `tauri-plugin-autostart`
 - [ ] Self‑host the “Press Start 2P” font (remove the external dependency)
 - [ ] Carry the `LICENSE` file onto this branch
