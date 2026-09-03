@@ -10,7 +10,7 @@
 [![Platforms](https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-555)](#-production-build)
 [![License](https://img.shields.io/badge/license-MIT-green)](#-license)
 
-<img src="docs/demo.gif" alt="Hydrate Buddy demo — the wizard walks in, you confirm, confetti happens" width="400">
+<video src="docs/demo.mp4" autoplay loop muted playsinline width="400"></video>
 
 </div>
 
@@ -296,12 +296,13 @@ This is a small, friendly project. PRs welcome!
 **Demo GIF** — after changing anything visual, re-record it with:
 
 ```bash
-sudo apt-get install -y ffmpeg xdotool gifsicle   # one-time (Linux/X11)
+brew install ffmpeg gifsicle                       # macOS (grant your terminal Screen Recording; quit the installed app)
+sudo apt-get install -y ffmpeg xdotool gifsicle    # Linux/X11
 scripts/capture-demo.sh                            # wizard; THEME=default to swap
 ```
 
 The script drives the real app (dev mode), clicks through one full reminder
-flow, and overwrites `docs/demo.gif`.
+flow, and overwrites `docs/demo.mp4` (`OUT=docs/demo.gif` for a GIF instead).
 
 ---
 
