@@ -403,6 +403,21 @@ fn trigger_reminder(app: &AppHandle) {
     if win.is_visible().unwrap_or(false) {
         return;
     }
+    // Demo capture support (debug builds only): hold the reminder until the
+    // recorder signals it is rolling via a marker file, then re-trigger.
+    #[cfg(debug_assertions)]
+    if let Some(marker) = demo_env_path("HYDRATE_BUDDY_DEFER_SHOW") {
+        if !marker.exists() {
+            let app = app.clone();
+            std::thread::spawn(move || {
+                while !marker.exists() {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                trigger_reminder(&app);
+            });
+            return;
+        }
+    }
     {
         let s = state.settings.lock().clone();
         let mut next = state.next_reminder_at.lock();
@@ -419,7 +434,45 @@ fn trigger_reminder(app: &AppHandle) {
     if let Err(e) = app.emit_to("reminder", "reminder:show", &payload) {
         log::warn!("failed to emit reminder:show: {e}");
     }
+    // Demo capture support (debug builds only): click YES for us once the
+    // recorder arms us via a marker file (or immediately if only a delay is
+    // given).
+    #[cfg(debug_assertions)]
+    {
+        let armed = demo_env_path("HYDRATE_BUDDY_AUTOCONFIRM_ARMED");
+        let delay_ms = std::env::var("HYDRATE_BUDDY_AUTOCONFIRM_MS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok());
+        if armed.is_some() || delay_ms.is_some() {
+            let app = app.clone();
+            std::thread::spawn(move || {
+                if let Some(marker) = armed {
+                    while !marker.exists() {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(
+                    delay_ms.unwrap_or(2600),
+                ));
+                if let Some(win) = app.get_webview_window("reminder") {
+                    let _ = win.eval("document.getElementById('yes-btn')?.click();");
+                }
+            });
+        }
+    }
     update_tray_tooltip(app);
+}
+
+fn demo_env_path(key: &str) -> Option<std::path::PathBuf> {
+    #[cfg(debug_assertions)]
+    {
+        std::env::var(key).ok().map(std::path::PathBuf::from)
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = key;
+        None
+    }
 }
 
 fn tick(app: &AppHandle) {
